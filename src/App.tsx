@@ -1,20 +1,99 @@
-import { useState } from 'react'
-import './App.css'
+import {
+  Box,
+  CssBaseline,
+  ThemeProvider,
+  Typography,
+} from "@mui/material";
+
+import {
+  Navigate,
+  Route,
+  Routes,
+} from "react-router-dom";
+
+import { useAuth } from "./hooks/useAuth";
+import { theme } from "./theme/theme";
+
+import LoginPage from "./components/LoginPage";
+import PresentationListPage from "./pages/PresentationListPage";
+import PresentationCreatePage from "./pages/PresentationCreatePage";
+import PresentationConfirmPage from "./pages/PresentationConfirmPage";
 
 function App() {
-  const [count, setCount] = useState(0)
-  function clicked() {
-    setCount(count+1);
-    console.log("クリックされたよ");
+  const {
+    session,
+    isAuthLoading,
+  } = useAuth();
+
+  if (isAuthLoading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+
+        <Box
+          sx={{
+            minHeight: "100vh",
+            display: "grid",
+            placeItems: "center",
+            bgcolor: "#f7f8fa",
+          }}
+        >
+          <Typography color="text.secondary">
+            読み込み中...
+          </Typography>
+        </Box>
+      </ThemeProvider>
+    );
   }
+
   return (
-    <>
-      <h1>Test Vercel</h1>
-      <div>{count}</div>
-      <button onClick={clicked}>increment</button>
-      <div>{}</div>
-    </>
-  )
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+
+      {!session ? (
+        <LoginPage />
+      ) : (
+        <Routes>
+          <Route
+            path="/"
+            element={
+              <PresentationListPage
+                session={session}
+              />
+            }
+          />
+
+          <Route
+            path="/presentations/new"
+            element={
+              <PresentationCreatePage
+                session={session}
+              />
+            }
+          />
+
+          <Route
+            path="/presentations/confirm"
+            element={
+              <PresentationConfirmPage
+                session={session}
+              />
+            }
+          />
+
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
+            }
+          />
+        </Routes>
+      )}
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;
