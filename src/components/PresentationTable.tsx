@@ -6,12 +6,16 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Typography,
 } from "@mui/material";
 
-import type { Presentation } from "../types/Presentation";
+import type { Presentation } from "../types/presantation";
 
 type PresentationTableProps = {
   rows: Presentation[];
+
+  // ページングしたときも番号を連番にするため
+  startIndex: number;
 };
 
 const tableHeadCellStyle = {
@@ -29,12 +33,12 @@ const tableBodyCellStyle = {
   px: 2,
   color: "#333333",
   fontSize: 13,
-  whiteSpace: "nowrap",
   borderBottom: "1px solid #dddddd",
 };
 
 export default function PresentationTable({
   rows,
+  startIndex,
 }: PresentationTableProps) {
   return (
     <TableContainer
@@ -49,11 +53,15 @@ export default function PresentationTable({
       <Table
         size="small"
         sx={{
-          minWidth: 850,
+          minWidth: 760,
         }}
       >
         <TableHead>
-          <TableRow sx={{ bgcolor: "#f0f1f3" }}>
+          <TableRow
+            sx={{
+              bgcolor: "#f0f1f3",
+            }}
+          >
             <TableCell sx={tableHeadCellStyle}>
               発表番号
             </TableCell>
@@ -63,11 +71,7 @@ export default function PresentationTable({
             </TableCell>
 
             <TableCell sx={tableHeadCellStyle}>
-              氏名
-            </TableCell>
-
-            <TableCell sx={tableHeadCellStyle}>
-              学籍番号
+              発表者
             </TableCell>
 
             <TableCell sx={tableHeadCellStyle}>
@@ -82,7 +86,7 @@ export default function PresentationTable({
 
         <TableBody>
           {rows.length > 0 ? (
-            rows.map((row) => (
+            rows.map((row, index) => (
               <TableRow
                 key={row.id}
                 hover
@@ -94,8 +98,9 @@ export default function PresentationTable({
                   },
                 }}
               >
+                {/* DBには保存せず、ここで自動採番 */}
                 <TableCell sx={tableBodyCellStyle}>
-                  {row.presentationNumber}
+                  {startIndex + index + 1}
                 </TableCell>
 
                 <TableCell sx={tableBodyCellStyle}>
@@ -103,26 +108,47 @@ export default function PresentationTable({
                 </TableCell>
 
                 <TableCell sx={tableBodyCellStyle}>
-                  {row.studentName}
+                  {row.presenters.length > 0 ? (
+                    row.presenters
+                      .map(
+                        (presenter) =>
+                          presenter.presenter_name,
+                      )
+                      .join("、")
+                  ) : (
+                    <Typography
+                      component="span"
+                      sx={{
+                        color: "#999999",
+                        fontSize: 13,
+                      }}
+                    >
+                      発表者なし
+                    </Typography>
+                  )}
                 </TableCell>
 
                 <TableCell sx={tableBodyCellStyle}>
-                  {row.studentNumber}
+                  {row.seminar_name}
                 </TableCell>
 
                 <TableCell sx={tableBodyCellStyle}>
-                  {row.seminarName}（{row.teacherName}）
-                </TableCell>
-
-                <TableCell sx={tableBodyCellStyle}>
-                  {row.registeredDate}
+                  {new Date(
+                    row.created_at,
+                  ).toLocaleDateString(
+                    "ja-JP",
+                    {
+                      month: "numeric",
+                      day: "numeric",
+                    },
+                  )}
                 </TableCell>
               </TableRow>
             ))
           ) : (
             <TableRow>
               <TableCell
-                colSpan={6}
+                colSpan={5}
                 align="center"
                 sx={{
                   py: 6,

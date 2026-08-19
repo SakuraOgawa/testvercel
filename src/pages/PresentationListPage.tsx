@@ -1,6 +1,10 @@
-import { useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import type { Session } from "@supabase/supabase-js";
-import { useNavigate } from "react-router-dom";
 
 import {
   Add,
@@ -10,6 +14,7 @@ import {
 import {
   Box,
   Button,
+  CircularProgress,
   Divider,
   InputAdornment,
   Pagination,
@@ -17,14 +22,21 @@ import {
   Typography,
 } from "@mui/material";
 
+import {
+  useNavigate,
+} from "react-router-dom";
+
 import { supabase } from "../lib/supabase";
-import { presentations } from "../data/Presentations";
 
 import FilterSelect from "../components/FilterSelect";
+
 import PresentationTable from "../components/PresentationTable";
+
 import Sidebar, {
   drawerWidth,
 } from "../components/Sidebar";
+
+import type { Presentation } from "../types/presentation";
 
 type PresentationListPageProps = {
   session: Session;
@@ -36,86 +48,241 @@ export default function PresentationListPage({
   session,
 }: PresentationListPageProps) {
   const navigate = useNavigate();
-  const [keyword, setKeyword] = useState("");
-  const [seminar, setSeminar] = useState("");
-  const [teacher, setTeacher] = useState("");
-  const [page, setPage] = useState(1);
 
-  const seminarOptions = useMemo(() => {
-    return [
-      ...new Set(
-        presentations.map(
-          (presentation) => presentation.seminarName,
-        ),
-      ),
-    ];
-  }, []);
+  const [
+    presentations,
+    setPresentations,
+  ] = useState<Presentation[]>([]);
 
-  const teacherOptions = useMemo(() => {
-    return [
-      ...new Set(
-        presentations.map(
-          (presentation) => presentation.teacherName,
-        ),
-      ),
-    ];
-  }, []);
+  const [
+    isLoading,
+    setIsLoading,
+  ] = useState(true);
 
-  const filteredPresentations = useMemo(() => {
-    const normalizedKeyword = keyword.trim().toLowerCase();
+  const [
+    loadError,
+    setLoadError,
+  ] = useState("");
 
-    return presentations.filter((presentation) => {
-      const matchesKeyword =
-        normalizedKeyword === "" ||
-        presentation.title
-          .toLowerCase()
-          .includes(normalizedKeyword) ||
-        presentation.studentName
-          .toLowerCase()
-          .includes(normalizedKeyword) ||
-        presentation.studentNumber
-          .toLowerCase()
-          .includes(normalizedKeyword);
+  const [keyword, setKeyword] =
+    useState("");
 
-      const matchesSeminar =
-        seminar === "" ||
-        presentation.seminarName === seminar;
+  const [seminar, setSeminar] =
+    useState("");
 
-      const matchesTeacher =
-        teacher === "" ||
-        presentation.teacherName === teacher;
+  const [page, setPage] =
+    useState(1);
 
-      return (
-        matchesKeyword &&
-        matchesSeminar &&
-        matchesTeacher
+  /*
+   * =========================================
+   * Supabaseから発表一覧を取得
+   * =========================================
+   */
+  useEffect(() => {
+    const fetchPresentations = async () => {
+      setIsLoading(true);
+      setLoadError("");
+
+      /*
+       * presentations
+       *
+       *     ↓ FK
+       *
+       * presenters
+       *
+       * をまとめて取得
+       */
+      const {
+        data,
+        error,
+      } = await supabase
+        .from("presentations")
+        .select(`
+          id,
+          title,
+          seminar_name,
+          created_at,
+          presenters (
+            presenter_name
+          )
+        `)
+        .order(
+          "created_at",
+          {
+            ascending: true,
+          },
+        );
+
+      if (error) {
+        console.error(
+          "発表一覧取得エラー:",
+          error,
+        );
+
+        setLoadError(
+          "発表一覧の取得に失敗しました。",
+        );
+
+        setIsLoading(false);
+
+        return;
+      }
+
+      setPresentations(
+        (data ?? []) as Presentation[],
       );
-    });
-  }, [keyword, seminar, teacher]);
 
+      setIsLoading(false);
+    };
+
+    void fetchPresentations();
+  }, []);
+
+  /*
+   * =========================================
+   * ゼミ一覧
+   * =========================================
+   */
+  const seminarOptions =
+    useMemo(() => {
+      return [
+        ...new Set(
+          presentations
+            .map(
+              (presentation) =>
+                presentation.seminar_name,
+            )
+            .filter(Boolean),
+        ),
+      ];
+    }, [presentations]);
+
+  /*
+   * =========================================
+   * 検索・絞り込み
+   * =========================================
+   */
+  const filteredPresentations =
+    useMemo(() => {
+      const normalizedKeyword =
+        keyword
+          .trim()
+          .toLowerCase();
+
+      return presentations.filter(
+        (presentation) => {
+          /*
+           * 発表者名を1つの文字列にする
+           *
+           * 山田太郎、佐藤花子
+           */
+          const presenterNames =
+            presentation.presenters
+              .map(
+                (presenter) =>
+                  presenter.presenter_name,
+              )
+              .join(" ")
+              .toLowerCase();
+
+          const matchesKeyword =
+            normalizedKeyword === "" ||
+            presentation.title
+              .toLowerCase()
+              .includes(
+                normalizedKeyword,
+              ) ||
+            presenterNames.includes(
+              normalizedKeyword,
+            );
+
+          const matchesSeminar =
+            seminar === "" ||
+            presentation.seminar_name ===
+              seminar;
+
+          return (
+            matchesKeyword &&
+            matchesSeminar
+          );
+        },
+      );
+    }, [
+      presentations,
+      keyword,
+      seminar,
+    ]);
+
+  /*
+   * =========================================
+   * ページ数
+   * =========================================
+   */
   const pageCount = Math.max(
     1,
     Math.ceil(
-      filteredPresentations.length / rowsPerPage,
+      filteredPresentations.length /
+        rowsPerPage,
     ),
   );
 
-  // ページ番号が最大ページ数を超えないようにする
-  const currentPage = Math.min(page, pageCount);
+  const currentPage = Math.min(
+    page,
+    pageCount,
+  );
 
-  const displayedPresentations = useMemo(() => {
-    const startIndex =
-      (currentPage - 1) * rowsPerPage;
+  /*
+   * =========================================
+   * 現在のページのデータ
+   * =========================================
+   */
+  const displayedPresentations =
+    useMemo(() => {
+      const startIndex =
+        (currentPage - 1) *
+        rowsPerPage;
 
-    const endIndex =
-      startIndex + rowsPerPage;
+      const endIndex =
+        startIndex +
+        rowsPerPage;
 
-    return filteredPresentations.slice(
-      startIndex,
-      endIndex,
-    );
-  }, [filteredPresentations, currentPage]);
+      return filteredPresentations.slice(
+        startIndex,
+        endIndex,
+      );
+    }, [
+      filteredPresentations,
+      currentPage,
+    ]);
 
+  /*
+   * 発表番号の開始位置
+   *
+   * 1ページ目 → 0
+   * 2ページ目 → 5
+   * 3ページ目 → 10
+   */
+  const startIndex =
+    (currentPage - 1) *
+    rowsPerPage;
+
+  /*
+   * =========================================
+   * 新規登録
+   * =========================================
+   */
+  const handleCreatePresentation =
+    () => {
+      navigate(
+        "/presentations/new",
+      );
+    };
+
+  /*
+   * =========================================
+   * ログアウト
+   * =========================================
+   */
   const handleLogout = async () => {
     const { error } =
       await supabase.auth.signOut();
@@ -126,31 +293,6 @@ export default function PresentationListPage({
         error,
       );
     }
-  };
-
-  const handleCreatePresentation = () => {
-    navigate("/presentations/new");
-  };
-
-  const handleKeywordChange = (
-    value: string,
-  ) => {
-    setKeyword(value);
-    setPage(1);
-  };
-
-  const handleSeminarChange = (
-    value: string,
-  ) => {
-    setSeminar(value);
-    setPage(1);
-  };
-
-  const handleTeacherChange = (
-    value: string,
-  ) => {
-    setTeacher(value);
-    setPage(1);
   };
 
   return (
@@ -171,6 +313,7 @@ export default function PresentationListPage({
         component="main"
         sx={{
           minHeight: "100vh",
+
           ml: {
             xs: 0,
             md: `${drawerWidth}px`,
@@ -184,22 +327,32 @@ export default function PresentationListPage({
               sm: 3,
               md: 4.5,
             },
+
             pt: 4,
             pb: 7,
           }}
         >
+          {/* ============================== */}
+          {/* タイトル */}
+          {/* ============================== */}
+
           <Box
             sx={{
               display: "flex",
+
               flexDirection: {
                 xs: "column",
                 sm: "row",
               },
+
               alignItems: {
                 xs: "stretch",
                 sm: "center",
               },
-              justifyContent: "space-between",
+
+              justifyContent:
+                "space-between",
+
               gap: 2,
             }}
           >
@@ -214,41 +367,39 @@ export default function PresentationListPage({
               卒論発表一覧
             </Typography>
 
-            <Box
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={
+                handleCreatePresentation
+              }
               sx={{
-                display: "flex",
-                justifyContent: {
-                  xs: "stretch",
-                  sm: "flex-end",
+                minWidth: 160,
+                height: 44,
+                px: 2.5,
+
+                borderRadius: 1.5,
+
+                bgcolor: "#172e5a",
+
+                fontSize: 13,
+                fontWeight: 700,
+
+                textTransform:
+                  "none",
+
+                boxShadow: "none",
+
+                "&:hover": {
+                  bgcolor:
+                    "#102447",
+
+                  boxShadow: "none",
                 },
               }}
             >
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={
-                  handleCreatePresentation
-                }
-                sx={{
-                  minWidth: 160,
-                  height: 44,
-                  px: 2.5,
-                  borderRadius: 1.5,
-                  bgcolor: "#172e5a",
-                  fontSize: 13,
-                  fontWeight: 700,
-                  textTransform: "none",
-                  boxShadow: "none",
-
-                  "&:hover": {
-                    bgcolor: "#102447",
-                    boxShadow: "none",
-                  },
-                }}
-              >
-                発表を新規登録
-              </Button>
-            </Box>
+              発表を新規登録
+            </Button>
           </Box>
 
           <Divider
@@ -258,44 +409,57 @@ export default function PresentationListPage({
             }}
           />
 
+          {/* ============================== */}
+          {/* 検索・絞り込み */}
+          {/* ============================== */}
+
           <Box
             sx={{
               mb: 3,
+
               display: "flex",
+
               flexDirection: {
                 xs: "column",
                 lg: "row",
               },
+
               alignItems: {
                 xs: "stretch",
                 lg: "center",
               },
+
               gap: 1.2,
             }}
           >
             <TextField
               value={keyword}
               onChange={(event) => {
-                handleKeywordChange(
+                setKeyword(
                   event.target.value,
                 );
+
+                setPage(1);
               }}
-              placeholder="タイトル・氏名・学籍番号で検索"
+              placeholder="タイトル・発表者名で検索"
               size="small"
               sx={{
                 width: {
                   xs: "100%",
                   lg: 330,
                 },
+
                 bgcolor: "#ffffff",
 
-                "& .MuiOutlinedInput-root": {
-                  height: 40,
-                  borderRadius: 0,
-                  fontSize: 13,
-                  boxShadow:
-                    "0 2px 5px rgba(0,0,0,0.12)",
-                },
+                "& .MuiOutlinedInput-root":
+                  {
+                    height: 40,
+                    borderRadius: 0,
+                    fontSize: 13,
+
+                    boxShadow:
+                      "0 2px 5px rgba(0,0,0,0.12)",
+                  },
               }}
               slotProps={{
                 input: {
@@ -303,7 +467,8 @@ export default function PresentationListPage({
                     <InputAdornment position="start">
                       <Search
                         sx={{
-                          color: "#b0b0b0",
+                          color:
+                            "#b0b0b0",
                         }}
                       />
                     </InputAdornment>
@@ -316,56 +481,132 @@ export default function PresentationListPage({
               value={seminar}
               placeholder="ゼミ名で絞り込み"
               options={seminarOptions}
-              onChange={handleSeminarChange}
-            />
-
-            <FilterSelect
-              value={teacher}
-              placeholder="教員名で絞り込み"
-              options={teacherOptions}
-              onChange={handleTeacherChange}
+              onChange={(value) => {
+                setSeminar(value);
+                setPage(1);
+              }}
             />
           </Box>
 
-          <PresentationTable
-            rows={displayedPresentations}
-          />
+          {/* ============================== */}
+          {/* 読み込み中 */}
+          {/* ============================== */}
 
-          <Box
-            sx={{
-              mt: 7,
-              display: "flex",
-              justifyContent: "center",
-            }}
-          >
-            <Pagination
-              count={pageCount}
-              page={currentPage}
-              onChange={(
-                _,
-                selectedPage,
-              ) => {
-                setPage(selectedPage);
-              }}
-              shape="rounded"
-              size="small"
+          {isLoading && (
+            <Box
               sx={{
-                "& .MuiPaginationItem-root":
-                  {
-                    minWidth: 28,
-                    height: 28,
-                    borderRadius: 0,
-                    fontSize: 13,
-                  },
+                py: 8,
 
-                "& .Mui-selected": {
-                  bgcolor:
-                    "#edf1f8 !important",
-                  color: "#5471aa",
-                },
+                display: "flex",
+
+                justifyContent:
+                  "center",
+
+                alignItems: "center",
               }}
-            />
-          </Box>
+            >
+              <CircularProgress
+                size={32}
+              />
+            </Box>
+          )}
+
+          {/* ============================== */}
+          {/* エラー */}
+          {/* ============================== */}
+
+          {!isLoading &&
+            loadError && (
+              <Typography
+                role="alert"
+                sx={{
+                  py: 4,
+
+                  color:
+                    "error.main",
+
+                  textAlign:
+                    "center",
+
+                  fontSize: 13,
+                }}
+              >
+                {loadError}
+              </Typography>
+            )}
+
+          {/* ============================== */}
+          {/* 発表一覧 */}
+          {/* ============================== */}
+
+          {!isLoading &&
+            !loadError && (
+              <>
+                <PresentationTable
+                  rows={
+                    displayedPresentations
+                  }
+                  startIndex={
+                    startIndex
+                  }
+                />
+
+                <Box
+                  sx={{
+                    mt: 7,
+
+                    display: "flex",
+
+                    justifyContent:
+                      "center",
+                  }}
+                >
+                  <Pagination
+                    count={
+                      pageCount
+                    }
+                    page={
+                      currentPage
+                    }
+                    onChange={(
+                      _,
+                      selectedPage,
+                    ) => {
+                      setPage(
+                        selectedPage,
+                      );
+                    }}
+                    shape="rounded"
+                    size="small"
+                    sx={{
+                      "& .MuiPaginationItem-root":
+                        {
+                          minWidth:
+                            28,
+
+                          height:
+                            28,
+
+                          borderRadius:
+                            0,
+
+                          fontSize:
+                            13,
+                        },
+
+                      "& .Mui-selected":
+                        {
+                          bgcolor:
+                            "#edf1f8 !important",
+
+                          color:
+                            "#5471aa",
+                        },
+                    }}
+                  />
+                </Box>
+              </>
+            )}
         </Box>
       </Box>
     </Box>
