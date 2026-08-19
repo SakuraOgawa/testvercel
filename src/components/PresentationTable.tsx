@@ -9,7 +9,7 @@ import {
   Typography,
 } from "@mui/material";
 
-import type { Presentation } from "../types/presantation";
+import type { Presentation } from "../types/presentation";
 
 type PresentationTableProps = {
   rows: Presentation[];
