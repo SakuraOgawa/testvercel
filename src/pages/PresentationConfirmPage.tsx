@@ -49,7 +49,10 @@ export default function PresentationConfirmPage({
 
   const form = locationState?.form;
 
-  // 入力画面を経由せず直接アクセスした場合
+  /*
+   * 登録画面を経由せず
+   * 確認画面へ直接アクセスした場合
+   */
   if (!form) {
     return (
       <Navigate
@@ -59,6 +62,12 @@ export default function PresentationConfirmPage({
     );
   }
 
+  /*
+   * 入力画面へ戻る
+   *
+   * formをstateで渡しているので、
+   * 入力内容を保持したまま戻ることができる
+   */
   const handleBack = () => {
     navigate("/presentations/new", {
       state: {
@@ -67,6 +76,9 @@ export default function PresentationConfirmPage({
     });
   };
 
+  /*
+   * ログアウト
+   */
   const handleLogout = async () => {
     const { error } =
       await supabase.auth.signOut();
@@ -79,72 +91,142 @@ export default function PresentationConfirmPage({
     }
   };
 
+  /*
+   * Supabaseへ登録
+   */
   const handleRegister = async () => {
+    /*
+     * 二重クリック防止
+     */
+    if (isSubmitting) {
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage("");
 
     try {
       /*
-       * Supabaseのカラム名は、
-       * 実際のテーブルに合わせて変更してください。
+       * ========================================
+       * 1. presentationsテーブルへ発表を登録
+       * ========================================
        */
-      const { data, error } = await supabase
+
+      const {
+        data: presentation,
+        error: presentationError,
+      } = await supabase
         .from("presentations")
         .insert({
-          student_number:
-            form.studentNumber,
-          student_name:
-            form.studentName,
           seminar_name:
-            form.seminarName,
-          title: form.title,
-          summary: form.summary,
-          document_url:
-            form.documentUrl || null,
-          repository_url:
-            form.repositoryUrl || null,
-          presentation_number:
-            Number(
-              form.presentationNumber,
-            ),
-          created_by: session.user.id,
+            form.seminarName.trim(),
+
+          title:
+            form.title.trim(),
+
+          summary:
+            form.summary.trim(),
+
+          material_url:
+            form.documentUrl.trim()
+              ? form.documentUrl.trim()
+              : null,
+
+          github_url:
+            form.repositoryUrl.trim()
+              ? form.repositoryUrl.trim()
+              : null,
+
+          /*
+           * Googleログイン中の
+           * SupabaseユーザーID
+           */
+          owner: session.user.id,
         })
+        /*
+         * INSERTした発表のidだけ取得
+         */
         .select("id")
         .single();
 
-      if (error) {
-        throw error;
+      if (presentationError) {
+        throw presentationError;
+      }
+
+      if (!presentation) {
+        throw new Error(
+          "登録した発表のIDを取得できませんでした。",
+        );
       }
 
       /*
-       * 発表者を中間テーブルへ保存する場合の例です。
-       * 発表者名ではなくIDで保存する方が適切です。
+       * ========================================
+       * 2. presentersテーブル用のデータを作る
+       * ========================================
+       *
+       * 例：
+       *
+       * presenters:
+       * [
+       *   "山田太郎",
+       *   "佐藤花子"
+       * ]
+       *
+       * ↓
+       *
+       * [
+       *   {
+       *     presentation_id: "...",
+       *     presenter_name: "山田太郎"
+       *   },
+       *   {
+       *     presentation_id: "...",
+       *     presenter_name: "佐藤花子"
+       *   }
+       * ]
        */
-      if (
-        data &&
-        form.presenters.length > 0
-      ) {
-        const memberRows =
-          form.presenters.map(
-            (presenterName) => ({
-              presentation_id: data.id,
-              presenter_name:
-                presenterName,
-            }),
-          );
 
-        const { error: memberError } =
-          await supabase
-            .from(
-              "presentation_members",
-            )
-            .insert(memberRows);
+      const presenterRows =
+        form.presenters.map(
+          (presenterName) => ({
+            presentation_id:
+              presentation.id,
 
-        if (memberError) {
-          throw memberError;
-        }
+            presenter_name:
+              presenterName.trim(),
+          }),
+        );
+
+      /*
+       * ========================================
+       * 3. presentersへまとめて登録
+       * ========================================
+       */
+
+      const {
+        error: presentersError,
+      } = await supabase
+        .from("presenters")
+        .insert(presenterRows);
+
+      if (presentersError) {
+        throw presentersError;
       }
 
+      /*
+       * ========================================
+       * 4. 登録成功
+       * ========================================
+       */
+
+      console.log(
+        "発表登録成功:",
+        presentation.id,
+      );
+
+      /*
+       * 一覧画面へ戻る
+       */
       navigate("/", {
         replace: true,
       });
@@ -155,7 +237,7 @@ export default function PresentationConfirmPage({
       );
 
       setErrorMessage(
-        "登録に失敗しました。Supabaseのテーブル設定や入力内容を確認してください。",
+        "発表の登録に失敗しました。時間をおいて再度お試しください。",
       );
     } finally {
       setIsSubmitting(false);
@@ -180,6 +262,7 @@ export default function PresentationConfirmPage({
         component="main"
         sx={{
           minHeight: "100vh",
+
           ml: {
             xs: 0,
             md: `${drawerWidth}px`,
@@ -191,14 +274,20 @@ export default function PresentationConfirmPage({
             width: "100%",
             maxWidth: 1000,
             mx: "auto",
+
             px: {
               xs: 2,
               sm: 3,
               md: 4,
             },
+
             py: 4,
           }}
         >
+          {/* ============================= */}
+          {/* タイトル */}
+          {/* ============================= */}
+
           <Typography
             component="h1"
             sx={{
@@ -218,8 +307,13 @@ export default function PresentationConfirmPage({
               fontSize: 13,
             }}
           >
-            以下の内容で登録します。入力内容に間違いがないか確認してください。
+            以下の内容で登録します。
+            入力内容に間違いがないか確認してください。
           </Typography>
+
+          {/* ============================= */}
+          {/* 確認内容 */}
+          {/* ============================= */}
 
           <Paper
             elevation={0}
@@ -228,33 +322,32 @@ export default function PresentationConfirmPage({
                 xs: 2,
                 sm: 3,
               },
+
               border:
                 "1px solid #dedede",
+
               borderRadius: 2,
+
               bgcolor: "#ffffff",
             }}
           >
             <Box
               sx={{
                 display: "grid",
+
                 gridTemplateColumns: {
                   xs: "1fr",
                   md: "1fr 1fr",
                 },
+
                 columnGap: 5,
               }}
             >
+              {/* ============================= */}
+              {/* 左側 */}
+              {/* ============================= */}
+
               <Box>
-                <ConfirmItem
-                  label="学籍番号"
-                  value={form.studentNumber}
-                />
-
-                <ConfirmItem
-                  label="氏名"
-                  value={form.studentName}
-                />
-
                 <ConfirmItem
                   label="ゼミ名（教員名）"
                   value={form.seminarName}
@@ -271,6 +364,10 @@ export default function PresentationConfirmPage({
                   multiline
                 />
               </Box>
+
+              {/* ============================= */}
+              {/* 右側 */}
+              {/* ============================= */}
 
               <Box>
                 <ConfirmItem
@@ -290,24 +387,20 @@ export default function PresentationConfirmPage({
                 <ConfirmItem
                   label="発表者"
                   value={
-                    form.presenters.length >
-                    0
+                    form.presenters.length > 0
                       ? form.presenters.join(
                           "、",
                         )
                       : ""
                   }
                 />
-
-                <ConfirmItem
-                  label="発表番号"
-                  value={
-                    form.presentationNumber
-                  }
-                />
               </Box>
             </Box>
           </Paper>
+
+          {/* ============================= */}
+          {/* Supabase登録エラー */}
+          {/* ============================= */}
 
           {errorMessage && (
             <Typography
@@ -323,15 +416,24 @@ export default function PresentationConfirmPage({
             </Typography>
           )}
 
+          {/* ============================= */}
+          {/* ボタン */}
+          {/* ============================= */}
+
           <Box
             sx={{
               mt: 3,
+
               display: "flex",
+
               flexDirection: {
                 xs: "column-reverse",
                 sm: "row",
               },
-              justifyContent: "flex-end",
+
+              justifyContent:
+                "flex-end",
+
               gap: 1.5,
             }}
           >
@@ -342,11 +444,25 @@ export default function PresentationConfirmPage({
               sx={{
                 minWidth: 140,
                 height: 44,
+
                 color: "#333333",
-                borderColor: "#bdbdbd",
+
+                borderColor:
+                  "#bdbdbd",
+
                 fontSize: 13,
                 fontWeight: 700,
-                textTransform: "none",
+
+                textTransform:
+                  "none",
+
+                "&:hover": {
+                  borderColor:
+                    "#999999",
+
+                  bgcolor:
+                    "#fafafa",
+                },
               }}
             >
               入力内容を修正
@@ -361,13 +477,18 @@ export default function PresentationConfirmPage({
               sx={{
                 minWidth: 160,
                 height: 44,
+
                 bgcolor: "#172e5a",
+
                 fontSize: 13,
                 fontWeight: 700,
-                textTransform: "none",
+
+                textTransform:
+                  "none",
 
                 "&:hover": {
-                  bgcolor: "#102447",
+                  bgcolor:
+                    "#102447",
                 },
               }}
             >
