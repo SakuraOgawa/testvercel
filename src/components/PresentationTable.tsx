@@ -111,7 +111,7 @@ export default function PresentationTable({
                   {row.presenters.length > 0 ? (
                     row.presenters
                       .map(
-                        (presenter) =>
+                        (presenter:any) =>
                           presenter.presenter_name,
                       )
                       .join("、")
