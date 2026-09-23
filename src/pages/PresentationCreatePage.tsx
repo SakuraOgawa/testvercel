@@ -1,11 +1,15 @@
 import { useState } from "react";
+
 import type {
   ChangeEvent,
   FormEvent,
   HTMLInputTypeAttribute,
   ReactNode,
 } from "react";
-import type { Session } from "@supabase/supabase-js";
+
+import type {
+  Session,
+} from "@supabase/supabase-js";
 
 import {
   Box,
@@ -22,6 +26,7 @@ import {
 import {
   useLocation,
   useNavigate,
+  useParams,
 } from "react-router-dom";
 
 import Sidebar, {
@@ -33,7 +38,7 @@ import { supabase } from "../lib/supabase";
 import {
   initialPresentationForm,
   type PresentationFormData,
-} from "../types/presantationForm";
+} from "../types/presentationForm"
 
 type PresentationCreatePageProps = {
   session: Session;
@@ -44,7 +49,10 @@ type LocationState = {
 };
 
 type FormErrors = Partial<
-  Record<keyof PresentationFormData, string>
+  Record<
+    keyof PresentationFormData,
+    string
+  >
 >;
 
 export default function PresentationCreatePage({
@@ -53,12 +61,27 @@ export default function PresentationCreatePage({
   const navigate = useNavigate();
   const location = useLocation();
 
+  /*
+   * URL
+   *
+   * /events/:eventId/presentations/new
+   *
+   * からeventIdを取得
+   */
+  const { eventId } = useParams<{
+    eventId: string;
+  }>();
+
   const locationState =
-    location.state as LocationState | null;
+    location.state as
+      | LocationState
+      | null;
 
   /*
-   * 確認画面から「修正する」で戻ってきた場合は、
-   * stateに保存されている入力内容を復元する
+   * 確認画面から「修正する」で
+   * 戻ってきた場合は、
+   * stateに保存されている
+   * 入力内容を復元する
    */
   const [form, setForm] =
     useState<PresentationFormData>(
@@ -67,13 +90,15 @@ export default function PresentationCreatePage({
     );
 
   /*
-   * 発表者追加用の入力欄
+   * 発表者の学籍番号入力欄
    */
-  const [presenterName, setPresenterName] =
-    useState("");
+  const [
+    studentNumber,
+    setStudentNumber,
+  ] = useState("");
 
   /*
-   * 発表者入力欄だけのエラー
+   * 学籍番号入力欄だけのエラー
    */
   const [
     presenterInputError,
@@ -83,11 +108,15 @@ export default function PresentationCreatePage({
   /*
    * フォーム全体のエラー
    */
-  const [errors, setErrors] =
-    useState<FormErrors>({});
+  const [
+    errors,
+    setErrors,
+  ] = useState<FormErrors>({});
 
   /*
-   * 通常のフォーム入力を変更する処理
+   * ========================================
+   * 通常フォーム変更
+   * ========================================
    */
   const handleChange = <
     Key extends keyof PresentationFormData,
@@ -95,99 +124,134 @@ export default function PresentationCreatePage({
     field: Key,
     value: PresentationFormData[Key],
   ) => {
-    setForm((previousForm) => ({
-      ...previousForm,
-      [field]: value,
-    }));
+    setForm(
+      (previousForm) => ({
+        ...previousForm,
+        [field]: value,
+      }),
+    );
 
     /*
-     * 入力された項目のエラーだけ消す
+     * 入力した項目の
+     * エラーだけ削除
      */
-    setErrors((previousErrors) => ({
-      ...previousErrors,
-      [field]: undefined,
-    }));
+    setErrors(
+      (previousErrors) => ({
+        ...previousErrors,
+        [field]: undefined,
+      }),
+    );
   };
 
   /*
-   * 発表者を追加
+   * ========================================
+   * 発表者の学籍番号を追加
+   * ========================================
    */
   const handleAddPresenter = () => {
-    const trimmedName =
-      presenterName.trim();
+    /*
+     * 学籍番号は
+     * 前後空白削除＋大文字に統一
+     */
+    const trimmedStudentNumber =
+      studentNumber
+        .trim()
+        .toUpperCase();
 
     /*
-     * 空欄の場合
+     * 空欄
      */
-    if (!trimmedName) {
+    if (!trimmedStudentNumber) {
       setPresenterInputError(
-        "発表者名を入力してください。",
+        "学籍番号を入力してください。",
       );
+
       return;
     }
 
     /*
-     * 同じ名前を二重登録しない
+     * 同じ学籍番号を
+     * 二重登録しない
      */
-    if (
-      form.presenters.includes(trimmedName)
-    ) {
-      setPresenterInputError(
-        "同じ発表者がすでに追加されています。",
+    const alreadyExists =
+      form.presenters.some(
+        (presenter) =>
+          presenter.toUpperCase() ===
+          trimmedStudentNumber,
       );
+
+    if (alreadyExists) {
+      setPresenterInputError(
+        "同じ学籍番号がすでに追加されています。",
+      );
+
       return;
     }
 
-    setForm((previousForm) => ({
-      ...previousForm,
-      presenters: [
-        ...previousForm.presenters,
-        trimmedName,
-      ],
-    }));
+    setForm(
+      (previousForm) => ({
+        ...previousForm,
+
+        presenters: [
+          ...previousForm.presenters,
+          trimmedStudentNumber,
+        ],
+      }),
+    );
 
     /*
      * 追加後は入力欄を空にする
      */
-    setPresenterName("");
+    setStudentNumber("");
 
     setPresenterInputError("");
 
     /*
-     * 「発表者を追加してください」の
-     * バリデーションエラーも消す
+     * 「発表者を追加してください」
+     * エラーも削除
      */
-    setErrors((previousErrors) => ({
-      ...previousErrors,
-      presenters: undefined,
-    }));
+    setErrors(
+      (previousErrors) => ({
+        ...previousErrors,
+        presenters: undefined,
+      }),
+    );
   };
 
   /*
-   * 発表者を削除
+   * ========================================
+   * 発表者削除
+   * ========================================
    */
   const handleRemovePresenter = (
     index: number,
   ) => {
-    setForm((previousForm) => ({
-      ...previousForm,
+    setForm(
+      (previousForm) => ({
+        ...previousForm,
 
-      presenters:
-        previousForm.presenters.filter(
-          (_, presenterIndex) =>
-            presenterIndex !== index,
-        ),
-    }));
+        presenters:
+          previousForm.presenters.filter(
+            (_, presenterIndex) =>
+              presenterIndex !== index,
+          ),
+      }),
+    );
   };
 
   /*
-   * フォーム全体のバリデーション
+   * ========================================
+   * バリデーション
+   * ========================================
    */
   const validateForm =
     (): FormErrors => {
-      const newErrors: FormErrors = {};
+      const newErrors:
+        FormErrors = {};
 
-      if (!form.seminarName.trim()) {
+      if (
+        !form.seminarName.trim()
+      ) {
         newErrors.seminarName =
           "ゼミ名または教員名を入力してください。";
       }
@@ -203,17 +267,20 @@ export default function PresentationCreatePage({
       }
 
       if (
-        form.presenters.length === 0
+        form.presenters.length ===
+        0
       ) {
         newErrors.presenters =
-          "発表者を1人以上追加してください。";
+          "発表者の学籍番号を1件以上追加してください。";
       }
 
       return newErrors;
     };
 
   /*
+   * ========================================
    * 「入力内容を確認」
+   * ========================================
    */
   const handleSubmit = (
     event: FormEvent<HTMLFormElement>,
@@ -228,17 +295,25 @@ export default function PresentationCreatePage({
         validationErrors,
       ).length > 0
     ) {
-      setErrors(validationErrors);
+      setErrors(
+        validationErrors,
+      );
+
+      return;
+    }
+
+    if (!eventId) {
       return;
     }
 
     setErrors({});
 
     /*
-     * 確認画面へ入力データを渡す
+     * eventIdをURLに維持したまま
+     * 確認画面へ
      */
     navigate(
-      "/presentations/confirm",
+      `/events/${eventId}/presentations/confirm`,
       {
         state: {
           form,
@@ -248,26 +323,91 @@ export default function PresentationCreatePage({
   };
 
   /*
+   * ========================================
    * キャンセル
+   * ========================================
    */
   const handleCancel = () => {
-    navigate("/");
+    if (!eventId) {
+      navigate("/events");
+      return;
+    }
+
+    navigate(
+      `/events/${eventId}/presentations`,
+    );
   };
 
   /*
+   * ========================================
    * ログアウト
+   * ========================================
    */
-  const handleLogout = async () => {
-    const { error } =
-      await supabase.auth.signOut();
+  const handleLogout =
+    async () => {
+      const { error } =
+        await supabase.auth.signOut();
 
-    if (error) {
-      console.error(
-        "ログアウトエラー:",
-        error,
-      );
-    }
-  };
+      if (error) {
+        console.error(
+          "ログアウトエラー:",
+          error,
+        );
+      }
+    };
+
+  /*
+   * ========================================
+   * eventIdが存在しない
+   * ========================================
+   */
+  if (!eventId) {
+    return (
+      <Box
+        sx={{
+          minHeight: "100vh",
+
+          display: "grid",
+
+          placeItems: "center",
+
+          bgcolor: "#f7f8fa",
+        }}
+      >
+        <Box
+          sx={{
+            textAlign: "center",
+          }}
+        >
+          <Typography
+            color="error"
+            sx={{
+              mb: 2,
+            }}
+          >
+            発表会を特定できませんでした。
+          </Typography>
+
+          <Button
+            variant="contained"
+            onClick={() => {
+              navigate("/events");
+            }}
+            sx={{
+              bgcolor: "#172e5a",
+
+              "&:hover": {
+                bgcolor:
+                  "#102447",
+              },
+            }}
+          >
+            発表会一覧へ戻る
+          </Button>
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <Box
@@ -319,8 +459,11 @@ export default function PresentationCreatePage({
             component="h1"
             sx={{
               mb: 3,
+
               fontSize: 22,
+
               fontWeight: 700,
+
               color: "#333333",
             }}
           >
@@ -360,18 +503,23 @@ export default function PresentationCreatePage({
               </FormFieldLabel>
 
               <StyledTextField
-                value={form.seminarName}
-                placeholder="例）貞廣ゼミ"
+                value={
+                  form.seminarName
+                }
+                placeholder="例）〇〇ゼミ"
                 error={Boolean(
                   errors.seminarName,
                 )}
                 helperText={
                   errors.seminarName
                 }
-                onChange={(event) => {
+                onChange={(
+                  event,
+                ) => {
                   handleChange(
                     "seminarName",
-                    event.target.value,
+                    event.target
+                      .value,
                   );
                 }}
               />
@@ -388,11 +536,16 @@ export default function PresentationCreatePage({
                 error={Boolean(
                   errors.title,
                 )}
-                helperText={errors.title}
-                onChange={(event) => {
+                helperText={
+                  errors.title
+                }
+                onChange={(
+                  event,
+                ) => {
                   handleChange(
                     "title",
-                    event.target.value,
+                    event.target
+                      .value,
                   );
                 }}
               />
@@ -407,16 +560,23 @@ export default function PresentationCreatePage({
                 fullWidth
                 multiline
                 minRows={8}
-                value={form.summary}
+                value={
+                  form.summary
+                }
                 placeholder="発表の概要を入力してください"
                 error={Boolean(
                   errors.summary,
                 )}
-                helperText={errors.summary}
-                onChange={(event) => {
+                helperText={
+                  errors.summary
+                }
+                onChange={(
+                  event,
+                ) => {
                   handleChange(
                     "summary",
-                    event.target.value,
+                    event.target
+                      .value,
                   );
                 }}
                 sx={fieldStyle}
@@ -435,12 +595,18 @@ export default function PresentationCreatePage({
               </FormFieldLabel>
 
               <StyledTextField
-                value={form.documentUrl}
+                type="url"
+                value={
+                  form.documentUrl
+                }
                 placeholder="例）https://example.com/slides.pdf"
-                onChange={(event) => {
+                onChange={(
+                  event,
+                ) => {
                   handleChange(
                     "documentUrl",
-                    event.target.value,
+                    event.target
+                      .value,
                   );
                 }}
               />
@@ -452,14 +618,18 @@ export default function PresentationCreatePage({
               </FormFieldLabel>
 
               <StyledTextField
+                type="url"
                 value={
                   form.repositoryUrl
                 }
                 placeholder="例）https://github.com/example/repo"
-                onChange={(event) => {
+                onChange={(
+                  event,
+                ) => {
                   handleChange(
                     "repositoryUrl",
-                    event.target.value,
+                    event.target
+                      .value,
                   );
                 }}
               />
@@ -475,36 +645,51 @@ export default function PresentationCreatePage({
               <Typography
                 sx={{
                   mb: 1,
+
                   color: "#777777",
+
                   fontSize: 12,
                 }}
               >
-                発表者名を入力して＋ボタンで追加してください
+                発表者の学籍番号を入力して＋ボタンで追加してください
               </Typography>
 
-              {/* 発表者入力欄 */}
+              {/* 学籍番号入力欄 */}
 
               <Box
                 sx={{
                   display: "flex",
-                  alignItems: "flex-start",
+
+                  alignItems:
+                    "flex-start",
+
                   gap: 1,
                 }}
               >
                 <TextField
                   fullWidth
                   size="small"
-                  value={presenterName}
-                  placeholder="例）山田 太郎"
+
+                  value={
+                    studentNumber
+                  }
+
+                  placeholder="例）G23900"
+
                   error={Boolean(
                     presenterInputError,
                   )}
+
                   helperText={
                     presenterInputError
                   }
-                  onChange={(event) => {
-                    setPresenterName(
-                      event.target.value,
+
+                  onChange={(
+                    event,
+                  ) => {
+                    setStudentNumber(
+                      event.target
+                        .value,
                     );
 
                     if (
@@ -515,30 +700,45 @@ export default function PresentationCreatePage({
                       );
                     }
                   }}
-                
+
+                  /*
+                   * Enterで追加しない。
+                   *
+                   * IME変換のEnterで
+                   * 勝手に追加される問題を防ぐ。
+                   */
                   sx={fieldStyle}
                 />
 
                 <Button
                   type="button"
+
                   variant="contained"
+
                   aria-label="発表者を追加"
+
                   onClick={
                     handleAddPresenter
                   }
+
                   sx={{
                     minWidth: 44,
+
                     width: 44,
+
                     height: 40,
+
                     p: 0,
 
-                    bgcolor: "#172e5a",
+                    bgcolor:
+                      "#172e5a",
 
                     boxShadow:
                       "0 2px 5px rgba(0,0,0,0.12)",
 
                     "&:hover": {
-                      bgcolor: "#102447",
+                      bgcolor:
+                        "#102447",
                     },
                   }}
                 >
@@ -550,14 +750,17 @@ export default function PresentationCreatePage({
               {/* 追加済み発表者 */}
               {/* ============================= */}
 
-              {form.presenters.length >
-                0 && (
+              {form.presenters
+                .length > 0 && (
                 <Box
                   sx={{
                     mt: 1,
+
                     display: "flex",
+
                     flexDirection:
                       "column",
+
                     gap: 1,
                   }}
                 >
@@ -573,16 +776,20 @@ export default function PresentationCreatePage({
 
                           px: 1.5,
 
-                          display: "flex",
+                          display:
+                            "flex",
+
                           alignItems:
                             "center",
+
                           justifyContent:
                             "space-between",
 
                           border:
                             "1px solid #d5d5d5",
 
-                          borderRadius: 1,
+                          borderRadius:
+                            1,
 
                           bgcolor:
                             "#ffffff",
@@ -593,9 +800,14 @@ export default function PresentationCreatePage({
                       >
                         <Typography
                           sx={{
-                            fontSize: 13,
+                            fontSize:
+                              13,
+
                             color:
                               "#333333",
+
+                            fontWeight:
+                              600,
                           }}
                         >
                           {presenter}
@@ -603,31 +815,42 @@ export default function PresentationCreatePage({
 
                         <Button
                           type="button"
+
                           aria-label={`${presenter}を削除`}
+
                           onClick={() => {
                             handleRemovePresenter(
                               index,
                             );
                           }}
+
                           sx={{
-                            minWidth: 32,
+                            minWidth:
+                              32,
+
                             width: 32,
+
                             height: 32,
+
                             p: 0,
+
                             color:
                               "#888888",
 
-                            "&:hover": {
-                              color:
-                                "#d32f2f",
-                              bgcolor:
-                                "rgba(211,47,47,0.05)",
-                            },
+                            "&:hover":
+                              {
+                                color:
+                                  "#d32f2f",
+
+                                bgcolor:
+                                  "rgba(211,47,47,0.05)",
+                              },
                           }}
                         >
                           <Close
                             sx={{
-                              fontSize: 19,
+                              fontSize:
+                                19,
                             }}
                           />
                         </Button>
@@ -637,18 +860,24 @@ export default function PresentationCreatePage({
                 </Box>
               )}
 
-              {/* 発表者0人の場合のエラー */}
+              {/* 発表者0件 */}
 
               {errors.presenters && (
                 <Typography
                   role="alert"
+
                   sx={{
                     mt: 0.7,
-                    color: "error.main",
+
+                    color:
+                      "error.main",
+
                     fontSize: 12,
                   }}
                 >
-                  {errors.presenters}
+                  {
+                    errors.presenters
+                  }
                 </Typography>
               )}
 
@@ -678,8 +907,13 @@ export default function PresentationCreatePage({
               >
                 <Button
                   type="button"
+
                   variant="outlined"
-                  onClick={handleCancel}
+
+                  onClick={
+                    handleCancel
+                  }
+
                   sx={{
                     width: {
                       xs: "100%",
@@ -688,12 +922,17 @@ export default function PresentationCreatePage({
 
                     height: 44,
 
-                    color: "#333333",
+                    color:
+                      "#333333",
+
                     borderColor:
                       "#bdbdbd",
 
                     fontSize: 13,
-                    fontWeight: 700,
+
+                    fontWeight:
+                      700,
+
                     textTransform:
                       "none",
 
@@ -714,7 +953,9 @@ export default function PresentationCreatePage({
 
                 <Button
                   type="submit"
+
                   variant="contained"
+
                   sx={{
                     width: {
                       xs: "100%",
@@ -723,10 +964,14 @@ export default function PresentationCreatePage({
 
                     height: 44,
 
-                    bgcolor: "#172e5a",
+                    bgcolor:
+                      "#172e5a",
 
                     fontSize: 13,
-                    fontWeight: 700,
+
+                    fontWeight:
+                      700,
+
                     textTransform:
                       "none",
 
@@ -775,6 +1020,7 @@ function FormFieldLabel({
         color: "#333333",
 
         fontSize: 13,
+
         fontWeight: 700,
       }}
     >
@@ -791,11 +1037,13 @@ function FormFieldLabel({
 
 type StyledTextFieldProps = {
   value: string;
+
   placeholder: string;
 
   type?: HTMLInputTypeAttribute;
 
   error?: boolean;
+
   helperText?: string;
 
   onChange: (
@@ -814,13 +1062,21 @@ function StyledTextField({
   return (
     <TextField
       fullWidth
+
       size="small"
+
       type={type}
+
       value={value}
+
       placeholder={placeholder}
+
       error={error}
+
       helperText={helperText}
+
       onChange={onChange}
+
       sx={fieldStyle}
     />
   );
@@ -858,7 +1114,9 @@ const fieldStyle = {
 
   "& .MuiFormHelperText-root": {
     mx: 0,
+
     mt: 0.5,
+
     fontSize: 12,
   },
 };

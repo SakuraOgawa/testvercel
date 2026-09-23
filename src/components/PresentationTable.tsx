@@ -110,11 +110,11 @@ export default function PresentationTable({
                 <TableCell sx={tableBodyCellStyle}>
                   {row.presenters.length > 0 ? (
                     row.presenters
-                      .map(
-                        (presenter:any) =>
-                          presenter.presenter_name,
-                      )
-                      .join("、")
+                    .map(
+                      (presenter) =>
+                        presenter.student_number,
+                    )
+                    .join("、")
                   ) : (
                     <Typography
                       component="span"

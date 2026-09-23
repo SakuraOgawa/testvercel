@@ -1,5 +1,5 @@
 export type Presenter = {
-  presenter_name: string;
+  student_number: string;
 };
 
 export type Presentation = {
