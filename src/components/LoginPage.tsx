@@ -68,6 +68,7 @@ export default function LoginPage() {
             fontSize: 14,
           }}
         >
+          初めて利用する方も<br/>
           Googleアカウントでログインしてください
         </Typography>
 

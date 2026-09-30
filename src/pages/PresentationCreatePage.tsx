@@ -7,10 +7,6 @@ import type {
   ReactNode,
 } from "react";
 
-import type {
-  Session,
-} from "@supabase/supabase-js";
-
 import {
   Box,
   Button,
@@ -33,16 +29,12 @@ import Sidebar, {
   drawerWidth,
 } from "../components/Sidebar";
 
-import { supabase } from "../lib/supabase";
 
 import {
   initialPresentationForm,
   type PresentationFormData,
 } from "../types/presentationForm"
 
-type PresentationCreatePageProps = {
-  session: Session;
-};
 
 type LocationState = {
   form?: PresentationFormData;
@@ -55,9 +47,7 @@ type FormErrors = Partial<
   >
 >;
 
-export default function PresentationCreatePage({
-  session,
-}: PresentationCreatePageProps) {
+export default function PresentationCreatePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -340,24 +330,6 @@ export default function PresentationCreatePage({
 
   /*
    * ========================================
-   * ログアウト
-   * ========================================
-   */
-  const handleLogout =
-    async () => {
-      const { error } =
-        await supabase.auth.signOut();
-
-      if (error) {
-        console.error(
-          "ログアウトエラー:",
-          error,
-        );
-      }
-    };
-
-  /*
-   * ========================================
    * eventIdが存在しない
    * ========================================
    */
@@ -416,12 +388,7 @@ export default function PresentationCreatePage({
         bgcolor: "#ffffff",
       }}
     >
-      <Sidebar
-        session={session}
-        onLogout={() => {
-          void handleLogout();
-        }}
-      />
+      <Sidebar />
 
       <Box
         component="main"

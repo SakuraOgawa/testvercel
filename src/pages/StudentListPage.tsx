@@ -4,10 +4,6 @@ import {
   useState,
 } from "react";
 
-import type {
-  Session,
-} from "@supabase/supabase-js";
-
 import {
   Search,
 } from "@mui/icons-material";
@@ -38,17 +34,11 @@ import Sidebar, {
 
 import { supabase } from "../lib/supabase";
 
-type StudentListPageProps = {
-  session: Session;
-};
-
 type Student = {
   studentNumber: string;
 };
 
-export default function StudentListPage({
-  session,
-}: StudentListPageProps) {
+export default function StudentListPage() {
   /*
    * URL:
    *
@@ -281,24 +271,6 @@ export default function StudentListPage({
       keyword,
     ]);
 
-  /*
-   * ========================================
-   * ログアウト
-   * ========================================
-   */
-
-  const handleLogout =
-    async () => {
-      const { error } =
-        await supabase.auth.signOut();
-
-      if (error) {
-        console.error(
-          "ログアウトエラー:",
-          error,
-        );
-      }
-    };
 
   /*
    * ========================================
@@ -327,12 +299,7 @@ export default function StudentListPage({
       {/* Sidebar */}
       {/* ================================= */}
 
-      <Sidebar
-        session={session}
-        onLogout={() => {
-          void handleLogout();
-        }}
-      />
+      <Sidebar />
 
       {/* ================================= */}
       {/* Main */}

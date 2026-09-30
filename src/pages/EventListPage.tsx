@@ -3,10 +3,6 @@ import {
   useState,
 } from "react";
 
-import type {
-  Session,
-} from "@supabase/supabase-js";
-
 import {
   Add,
 } from "@mui/icons-material";
@@ -28,26 +24,43 @@ import Sidebar, {
 
 import EventCard from "../components/EventCard";
 
-import { supabase } from "../lib/supabase";
+import {
+  useAuthContext,
+} from "../hooks/useAuthContext";
 
-import type {
-  Profile,
-} from "../types/profile";
+import {
+  supabase,
+} from "../lib/supabase";
 
 import type {
   PresentationEvent,
 } from "../types/presentationEvent";
 
-type EventListPageProps = {
-  session: Session;
-  profile: Profile;
-};
+/*
+ * ========================================
+ * EventListPage
+ * ========================================
+ */
 
-export default function EventListPage({
-  session,
-  profile,
-}: EventListPageProps) {
-  const navigate = useNavigate();
+export default function EventListPage() {
+  const navigate =
+    useNavigate();
+
+  /*
+   * ========================================
+   * AuthContext
+   * ========================================
+   */
+
+  const {
+    profile,
+  } = useAuthContext();
+
+  /*
+   * ========================================
+   * State
+   * ========================================
+   */
 
   const [
     events,
@@ -66,11 +79,18 @@ export default function EventListPage({
     setLoadError,
   ] = useState("");
 
+  /*
+   * ========================================
+   * 発表会取得
+   * ========================================
+   */
+
   useEffect(() => {
+    let isCancelled =
+      false;
+
     const fetchEvents =
       async () => {
-        setIsLoading(true);
-
         const {
           data,
           error,
@@ -94,6 +114,14 @@ export default function EventListPage({
             },
           );
 
+        /*
+         * ページ離脱後なら
+         * stateを更新しない
+         */
+        if (isCancelled) {
+          return;
+        }
+
         if (error) {
           console.error(
             "発表会取得エラー:",
@@ -105,6 +133,7 @@ export default function EventListPage({
           );
 
           setIsLoading(false);
+
           return;
         }
 
@@ -113,65 +142,116 @@ export default function EventListPage({
             PresentationEvent[],
         );
 
+        setLoadError("");
+
         setIsLoading(false);
       };
 
     void fetchEvents();
+
+    /*
+     * ========================================
+     * Cleanup
+     * ========================================
+     */
+
+    return () => {
+      isCancelled = true;
+    };
   }, []);
+
+  /*
+   * ========================================
+   * Profile Guard
+   * ========================================
+   *
+   * App.tsx側でもprofileの存在を
+   * 確認しているが、
+   * TypeScript上ではnullの可能性がある。
+   */
+
+  if (!profile) {
+    return null;
+  }
+
+  /*
+   * ========================================
+   * 発表会選択
+   * ========================================
+   */
 
   const handleEventClick = (
     event: PresentationEvent,
   ) => {
     /*
-     * 先生
-     * → 発表一覧
+     * 現時点ではroleに関係なく
+     * 発表一覧へ移動する。
+     *
+     * 将来的にstudentだけ
+     *
+     * ・自分の発表が存在する
+     *   → 編集画面
+     *
+     * ・存在しない
+     *   → 新規登録
+     *
+     * のように分岐可能。
      */
-    if (profile.role === "teacher") {
-      navigate(
-        `/events/${event.id}/presentations`,
-      );
 
-      return;
-    }
-
-    /*
-     * 学生
-     * → 後で
-     * 「自分の登録があるか」
-     * 判定するページへ
-     */
     navigate(
       `/events/${event.id}/presentations`,
     );
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-  };
+  /*
+   * ========================================
+   * 発表会作成権限
+   * ========================================
+   */
+
+  const canCreateEvent =
+    profile.role ===
+      "teacher" ||
+    profile.role ===
+      "admin";
+
+  /*
+   * ========================================
+   * Render
+   * ========================================
+   */
 
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        bgcolor: "#f7f8fa",
+        minHeight:
+          "100vh",
+
+        bgcolor:
+          "#f7f8fa",
       }}
     >
-      <Sidebar
-        session={session}
-        onLogout={() => {
-          void handleLogout();
-        }}
-      />
+      {/* ================================= */}
+      {/* Sidebar */}
+      {/* ================================= */}
+
+      <Sidebar />
+
+      {/* ================================= */}
+      {/* Main */}
+      {/* ================================= */}
 
       <Box
         component="main"
         sx={{
           ml: {
             xs: 0,
+
             md: `${drawerWidth}px`,
           },
 
-          minHeight: "100vh",
+          minHeight:
+            "100vh",
         }}
       >
         <Box
@@ -185,18 +265,27 @@ export default function EventListPage({
             py: 4,
           }}
         >
+          {/* ================================= */}
+          {/* Header */}
+          {/* ================================= */}
+
           <Box
             sx={{
               mb: 3,
 
-              display: "flex",
+              display:
+                "flex",
 
               justifyContent:
                 "space-between",
 
-              alignItems: "center",
+              alignItems:
+                "center",
 
               gap: 2,
+
+              flexWrap:
+                "wrap",
             }}
           >
             <Box>
@@ -204,7 +293,12 @@ export default function EventListPage({
                 component="h1"
                 sx={{
                   fontSize: 22,
-                  fontWeight: 700,
+
+                  fontWeight:
+                    700,
+
+                  color:
+                    "#333333",
                 }}
               >
                 発表会一覧
@@ -213,20 +307,28 @@ export default function EventListPage({
               <Typography
                 sx={{
                   mt: 0.5,
+
                   color:
                     "text.secondary",
-                  fontSize: 13,
+
+                  fontSize:
+                    13,
                 }}
               >
                 参加する発表会を選択してください。
               </Typography>
             </Box>
 
-            {profile.role ===
-              "teacher" && (
+            {/* ================================= */}
+            {/* 発表会新規作成 */}
+            {/* ================================= */}
+
+            {canCreateEvent && (
               <Button
                 variant="contained"
-                startIcon={<Add />}
+                startIcon={
+                  <Add />
+                }
                 onClick={() => {
                   navigate(
                     "/events/new",
@@ -236,7 +338,8 @@ export default function EventListPage({
                   bgcolor:
                     "#172e5a",
 
-                  fontWeight: 700,
+                  fontWeight:
+                    700,
 
                   textTransform:
                     "none",
@@ -252,12 +355,17 @@ export default function EventListPage({
             )}
           </Box>
 
+          {/* ================================= */}
+          {/* Loading */}
+          {/* ================================= */}
+
           {isLoading && (
             <Box
               sx={{
                 py: 8,
 
-                display: "flex",
+                display:
+                  "flex",
 
                 justifyContent:
                   "center",
@@ -267,10 +375,16 @@ export default function EventListPage({
             </Box>
           )}
 
+          {/* ================================= */}
+          {/* Error */}
+          {/* ================================= */}
+
           {!isLoading &&
             loadError && (
               <Typography
                 sx={{
+                  py: 8,
+
                   color:
                     "error.main",
 
@@ -282,17 +396,29 @@ export default function EventListPage({
               </Typography>
             )}
 
+          {/* ================================= */}
+          {/* Event List */}
+          {/* ================================= */}
+
           {!isLoading &&
-            !loadError && (
+            !loadError &&
+            events.length >
+              0 && (
               <Box
                 sx={{
-                  display: "grid",
+                  display:
+                    "grid",
 
                   gridTemplateColumns:
                     {
-                      xs: "1fr",
-                      md: "repeat(2, 1fr)",
-                      xl: "repeat(3, 1fr)",
+                      xs:
+                        "1fr",
+
+                      md:
+                        "repeat(2, minmax(0, 1fr))",
+
+                      xl:
+                        "repeat(3, minmax(0, 1fr))",
                     },
 
                   gap: 2,
@@ -301,8 +427,12 @@ export default function EventListPage({
                 {events.map(
                   (event) => (
                     <EventCard
-                      key={event.id}
-                      event={event}
+                      key={
+                        event.id
+                      }
+                      event={
+                        event
+                      }
                       onClick={() => {
                         handleEventClick(
                           event,
@@ -314,14 +444,21 @@ export default function EventListPage({
               </Box>
             )}
 
+          {/* ================================= */}
+          {/* Empty */}
+          {/* ================================= */}
+
           {!isLoading &&
             !loadError &&
-            events.length === 0 && (
+            events.length ===
+              0 && (
               <Typography
                 sx={{
                   py: 8,
+
                   color:
                     "text.secondary",
+
                   textAlign:
                     "center",
                 }}

@@ -1,5 +1,6 @@
 import {
   Box,
+  CircularProgress,
   CssBaseline,
   ThemeProvider,
   Typography,
@@ -11,60 +12,80 @@ import {
   Routes,
 } from "react-router-dom";
 
-import { useAuth } from "./hooks/useAuth";
-import { useProfile } from "./hooks/useProfile";
+import {
+  useAuthContext,
+} from "./hooks/useAuthContext";
 
-import { theme } from "./theme/theme";
+import {
+  theme,
+} from "./theme/theme";
+
+/*
+ * ========================================
+ * Components
+ * ========================================
+ */
 
 import LoginPage from "./components/LoginPage";
 
+/*
+ * ========================================
+ * Pages
+ * ========================================
+ */
+
 import EventListPage from "./pages/EventListPage";
+
 import EventCreatePage from "./pages/EventCreatePage";
 
 import PresentationListPage from "./pages/PresentationListPage";
-import PresentationCreatePage from "./pages/PresentationCreatePage";
-import PresentationConfirmPage from "./pages/PresentationConfirmPage";
-import StudentListPage from "./pages/StudentListPage"
 
-function App() {
+import PresentationCreatePage from "./pages/PresentationCreatePage";
+
+import PresentationConfirmPage from "./pages/PresentationConfirmPage";
+
+import StudentListPage from "./pages/StudentListPage";
+
+import RegisterPage from "./pages/RegisterPage";
+
+import StudentRegisterPage from "./pages/StudentRegisterPage";
+
+import TeacherRegisterPage from "./pages/TeacherRegisterPage";
+
+import AdminStudentPage from "./pages/AdminStudentPage";
+
+import AdminTeacherPage from "./pages/AdminTeacherPage";
+
+import SettingsPage from "./pages/SettingsPage";
+
+/*
+ * ========================================
+ * App
+ * ========================================
+ */
+
+export default function App() {
   /*
    * ========================================
-   * Authentication
+   * AuthContext
    * ========================================
    */
 
   const {
     session,
-    isAuthLoading,
-  } = useAuth();
-
-  /*
-   * ========================================
-   * Profile
-   * ========================================
-   */
-
-  const {
     profile,
+    isAuthLoading,
     isProfileLoading,
     profileError,
-  } = useProfile(
-    session?.user.id,
-  );
+  } = useAuthContext();
 
   /*
    * ========================================
-   * 認証・プロフィール読み込み中
+   * 認証情報読み込み中
    * ========================================
    */
 
-  if (
-    isAuthLoading ||
-    (
-      session &&
-      isProfileLoading
-    )
-  ) {
+  if (isAuthLoading) {
     return (
       <ThemeProvider
         theme={theme}
@@ -73,20 +94,23 @@ function App() {
 
         <Box
           sx={{
-            minHeight: "100vh",
+            minHeight:
+              "100vh",
 
-            display: "grid",
+            display:
+              "flex",
 
-            placeItems:
+            alignItems:
+              "center",
+
+            justifyContent:
               "center",
 
             bgcolor:
               "#f7f8fa",
           }}
         >
-          <Typography>
-            読み込み中...
-          </Typography>
+          <CircularProgress />
         </Box>
       </ThemeProvider>
     );
@@ -112,7 +136,44 @@ function App() {
 
   /*
    * ========================================
-   * Profile取得失敗
+   * Profile読み込み中
+   * ========================================
+   */
+
+  if (isProfileLoading) {
+    return (
+      <ThemeProvider
+        theme={theme}
+      >
+        <CssBaseline />
+
+        <Box
+          sx={{
+            minHeight:
+              "100vh",
+
+            display:
+              "flex",
+
+            alignItems:
+              "center",
+
+            justifyContent:
+              "center",
+
+            bgcolor:
+              "#f7f8fa",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      </ThemeProvider>
+    );
+  }
+
+  /*
+   * ========================================
+   * Profile取得エラー
    * ========================================
    */
 
@@ -128,23 +189,57 @@ function App() {
 
         <Box
           sx={{
-            minHeight: "100vh",
+            minHeight:
+              "100vh",
 
-            display: "grid",
+            display:
+              "flex",
 
-            placeItems:
+            alignItems:
               "center",
+
+            justifyContent:
+              "center",
+
+            px: 3,
 
             bgcolor:
               "#f7f8fa",
           }}
         >
-          <Typography
-            color="error"
+          <Box
+            sx={{
+              textAlign:
+                "center",
+            }}
           >
-            {profileError ||
-              "プロフィールが登録されていません。"}
-          </Typography>
+            <Typography
+              sx={{
+                mb: 1,
+
+                fontSize:
+                  20,
+
+                fontWeight:
+                  700,
+
+                color:
+                  "#172e5a",
+              }}
+            >
+              ユーザー情報を取得できませんでした
+            </Typography>
+
+            <Typography
+              sx={{
+                color:
+                  "text.secondary",
+              }}
+            >
+              {profileError ||
+                "プロフィールが登録されていません。"}
+            </Typography>
+          </Box>
         </Box>
       </ThemeProvider>
     );
@@ -152,7 +247,62 @@ function App() {
 
   /*
    * ========================================
-   * ログイン済み
+   * Role
+   * ========================================
+   */
+
+  const isPending =
+    profile.role ===
+    "pending";
+
+  const isStudentPending =
+    profile.role ===
+    "student_pending";
+
+  const isTeacherPending =
+    profile.role ===
+    "teacher_pending";
+
+  const isAdmin =
+    profile.role ===
+    "admin";
+
+  /*
+   * ========================================
+   * Permissions
+   * ========================================
+   */
+
+  /*
+   * 発表会を作成できる
+   *
+   * teacher
+   * admin
+   */
+  const canCreateEvent =
+    profile.role ===
+      "teacher" ||
+    profile.role ===
+      "admin";
+
+  /*
+   * 発表を登録できる
+   *
+   * student
+   * teacher
+   * admin
+   */
+  const canCreatePresentation =
+    profile.role ===
+      "student" ||
+    profile.role ===
+      "teacher" ||
+    profile.role ===
+      "admin";
+
+  /*
+   * ========================================
+   * Routes
    * ========================================
    */
 
@@ -163,14 +313,9 @@ function App() {
       <CssBaseline />
 
       <Routes>
-        {/*
-         * ==================================
-         * /
-         *
-         * トップページ
-         * → 発表会一覧
-         * ==================================
-         */}
+        {/* =============================== */}
+        {/* Root */}
+        {/* =============================== */}
 
         <Route
           path="/"
@@ -182,43 +327,40 @@ function App() {
           }
         />
 
+        {/* =============================== */}
+        {/* Register */}
+        {/* =============================== */}
+
         {/*
-         * ==================================
-         * /events
+         * /register
          *
-         * 発表会一覧
+         * pending
+         *   → 登録方法選択
          *
-         * 学生・先生共通
-         * ==================================
+         * student_pending
+         *   → 学生申請状況
+         *
+         * teacher_pending
+         *   → 教員申請状況
+         *
+         * 登録済み
+         *   → 発表会一覧
          */}
 
         <Route
-          path="/events"
+          path="/register"
           element={
-            <EventListPage
-              session={session}
-              profile={profile}
-            />
-          }
-        />
-
-        {/*
-         * ==================================
-         * /events/new
-         *
-         * 発表会新規作成
-         *
-         * 先生のみ
-         * ==================================
-         */}
-
-        <Route
-          path="/events/new"
-          element={
-            profile.role ===
-            "teacher" ? (
-              <EventCreatePage
-                session={session}
+            isPending ? (
+              <RegisterPage />
+            ) : isStudentPending ? (
+              <Navigate
+                to="/register/student"
+                replace
+              />
+            ) : isTeacherPending ? (
+              <Navigate
+                to="/register/teacher"
+                replace
               />
             ) : (
               <Navigate
@@ -229,87 +371,211 @@ function App() {
           }
         />
 
+        {/* =============================== */}
+        {/* Student Register */}
+        {/* =============================== */}
+
+        <Route
+          path="/register/student"
+          element={
+            isPending ||
+            isStudentPending ? (
+              <StudentRegisterPage />
+            ) : (
+              <Navigate
+                to="/events"
+                replace
+              />
+            )
+          }
+        />
+
+        {/* =============================== */}
+        {/* Teacher Register */}
+        {/* =============================== */}
+
+        <Route
+          path="/register/teacher"
+          element={
+            isPending ||
+            isTeacherPending ? (
+              <TeacherRegisterPage />
+            ) : (
+              <Navigate
+                to="/events"
+                replace
+              />
+            )
+          }
+        />
+
+        {/* =============================== */}
+        {/* Event List */}
+        {/* =============================== */}
+
         {/*
-         * ==================================
-         * 発表会ごとの発表一覧
-         *
-         * 例:
-         *
-         * /events/abc123/presentations
-         * ==================================
+         * 全roleが閲覧可能
+         */}
+
+        <Route
+          path="/events"
+          element={
+            <EventListPage />
+          }
+        />
+
+        {/* =============================== */}
+        {/* Event Create */}
+        {/* =============================== */}
+
+        {/*
+         * teacher / adminのみ
+         */}
+
+        <Route
+          path="/events/new"
+          element={
+            canCreateEvent ? (
+              <EventCreatePage />
+            ) : (
+              <Navigate
+                to="/events"
+                replace
+              />
+            )
+          }
+        />
+
+        {/* =============================== */}
+        {/* Presentation List */}
+        {/* =============================== */}
+
+        {/*
+         * 全roleが閲覧可能
          */}
 
         <Route
           path="/events/:eventId/presentations"
           element={
-            <PresentationListPage
-              session={session}
-            />
+            <PresentationListPage />
           }
         />
 
+        {/* =============================== */}
+        {/* Presentation Create */}
+        {/* =============================== */}
+
         {/*
-         * ==================================
-         * 発表新規登録
+         * student
+         * teacher
+         * admin
          *
-         * 例:
-         *
-         * /events/abc123/presentations/new
-         * ==================================
+         * のみ登録可能
          */}
 
         <Route
           path="/events/:eventId/presentations/new"
           element={
-            <PresentationCreatePage
-              session={session}
-            />
+            canCreatePresentation ? (
+              <PresentationCreatePage />
+            ) : (
+              <Navigate
+                to="/events"
+                replace
+              />
+            )
           }
         />
 
-        {/*
-         * ==================================
-         * 発表登録確認
-         *
-         * 例:
-         *
-         * /events/abc123/presentations/confirm
-         * ==================================
-         */}
+        {/* =============================== */}
+        {/* Presentation Confirm */}
+        {/* =============================== */}
 
         <Route
           path="/events/:eventId/presentations/confirm"
           element={
-            <PresentationConfirmPage
-              session={session}
-            />
-          }
-        />
-        {/*
-         * ==================================
-         * 学生一覧確認
-         *
-         * 例:
-         *
-         * /events/abc123/students
-         * ==================================
-         */}
-        <Route
-          path="/events/:eventId/students"
-          element={
-            <StudentListPage
-              session={session}
-            />
+            canCreatePresentation ? (
+              <PresentationConfirmPage />
+            ) : (
+              <Navigate
+                to="/events"
+                replace
+              />
+            )
           }
         />
 
+        {/* =============================== */}
+        {/* Student List */}
+        {/* =============================== */}
+
         {/*
-         * ==================================
-         * 存在しないURL
-         *
-         * → 発表会一覧
-         * ==================================
+         * 全roleが閲覧可能
          */}
+
+        <Route
+          path="/events/:eventId/students"
+          element={
+            <StudentListPage />
+          }
+        />
+
+        {/* =============================== */}
+        {/* Admin - Student Requests */}
+        {/* =============================== */}
+
+        {/*
+         * adminのみ
+         */}
+
+        <Route
+          path="/admin/students"
+          element={
+            isAdmin ? (
+              <AdminStudentPage />
+            ) : (
+              <Navigate
+                to="/events"
+                replace
+              />
+            )
+          }
+        />
+
+        {/* =============================== */}
+        {/* Admin - Teacher Requests */}
+        {/* =============================== */}
+
+        {/*
+         * adminのみ
+         */}
+
+        <Route
+          path="/admin/teachers"
+          element={
+            isAdmin ? (
+              <AdminTeacherPage />
+            ) : (
+              <Navigate
+                to="/events"
+                replace
+              />
+            )
+          }
+        />
+        {/* =============================== */}
+        {/* 設定 */}
+        {/* =============================== */}
+        <Route
+          path="/settings"
+          element={
+            <SettingsPage />
+          }
+        />
+
+        {/* =============================== */}
+        {/* Not Found */}
+        {/* =============================== */}
 
         <Route
           path="*"
@@ -324,5 +590,3 @@ function App() {
     </ThemeProvider>
   );
 }
-
-export default App;

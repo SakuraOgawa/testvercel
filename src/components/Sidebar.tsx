@@ -1,7 +1,3 @@
-import type {
-  Session,
-} from "@supabase/supabase-js";
-
 import {
   Avatar,
   Box,
@@ -10,9 +6,13 @@ import {
 } from "@mui/material";
 
 import {
+  AdminPanelSettings,
+  AssignmentInd,
   Home,
+  HowToReg,
   Logout,
   People,
+  PendingActions,
   School,
   Settings,
   Summarize,
@@ -24,42 +24,100 @@ import {
   useParams,
 } from "react-router-dom";
 
-export const drawerWidth = 256;
+import {
+  useAuthContext,
+} from "../hooks/useAuthContext";
 
-type SidebarProps = {
-  session: Session;
-  onLogout: () => void;
-};
+/*
+ * ========================================
+ * Sidebar幅
+ * ========================================
+ */
 
-export default function Sidebar({
-  session,
-  onLogout,
-}: SidebarProps) {
-  const navigate = useNavigate();
+export const drawerWidth =
+  256;
 
-  const location = useLocation();
+/*
+ * ========================================
+ * Component
+ * ========================================
+ */
+
+export default function Sidebar() {
+  const {
+    session,
+    profile,
+    logout,
+  } = useAuthContext();
+
+  const navigate =
+    useNavigate();
+
+  const location =
+    useLocation();
 
   /*
-   * URLが
-   *
-   * /events/:eventId/...
-   *
-   * の場合、ここからeventIdを取得する
+   * ========================================
+   * Event
+   * ========================================
    */
-  const { eventId } = useParams<{
+
+  const {
+    eventId,
+  } = useParams<{
     eventId: string;
   }>();
 
-  /*
-   * eventIdが存在する
-   * ＝ 発表会を選択済み
-   */
   const hasSelectedEvent =
     Boolean(eventId);
 
   /*
    * ========================================
-   * ユーザー情報
+   * Context読み込み前
+   * ========================================
+   */
+
+  if (!session || !profile) {
+    return null;
+  }
+
+  /*
+   * ========================================
+   * Role表示
+   * ========================================
+   */
+
+  const getRoleLabel = () => {
+    switch (profile.role) {
+      case "pending":
+        return "未登録";
+
+      case "student_pending":
+        return "学生登録申請中";
+
+      case "student":
+        return "学生";
+
+      case "teacher_pending":
+        return "教員申請中";
+
+      case "teacher":
+        return "教員";
+
+      case "admin":
+        return "管理者";
+
+      default:
+        return "";
+    }
+  };
+
+  const roleLabel =
+    getRoleLabel();
+
+  /*
+   * ========================================
+   * Googleユーザー情報
    * ========================================
    */
 
@@ -68,7 +126,6 @@ export default function Sidebar({
       ?.full_name ??
     session.user.user_metadata
       ?.name ??
-    session.user.email ??
     "ユーザー";
 
   const avatarUrl =
@@ -80,7 +137,7 @@ export default function Sidebar({
 
   /*
    * ========================================
-   * 現在開いているページか判定
+   * Active判定
    * ========================================
    */
 
@@ -88,13 +145,14 @@ export default function Sidebar({
     path: string,
   ) => {
     return (
-      location.pathname === path
+      location.pathname ===
+      path
     );
   };
 
   /*
    * ========================================
-   * メニュー共通スタイル
+   * Menu style
    * ========================================
    */
 
@@ -116,27 +174,49 @@ export default function Sidebar({
 
     fontWeight: 700,
 
-    textTransform: "none",
+    textTransform:
+      "none",
 
     borderRadius: 1,
 
-    /*
-     * 現在開いているページだけ
-     * 少し明るくする
-     */
     bgcolor: active
       ? "rgba(255,255,255,0.14)"
       : "transparent",
 
-    "& .MuiButton-startIcon": {
-      mr: 0,
-    },
+    "& .MuiButton-startIcon":
+      {
+        mr: 0,
+      },
 
     "&:hover": {
       bgcolor:
         "rgba(255,255,255,0.1)",
     },
   });
+
+  /*
+   * ========================================
+   * Logout
+   * ========================================
+   */
+
+  const handleLogout =
+    async () => {
+      try {
+        await logout();
+      } catch {
+        /*
+         * ログアウト失敗時は
+         * 現在画面を維持
+         */
+      }
+    };
+
+  /*
+   * ========================================
+   * JSX
+   * ========================================
+   */
 
   return (
     <Box
@@ -148,21 +228,22 @@ export default function Sidebar({
         bottom: 0,
         left: 0,
 
-        width: drawerWidth,
+        width:
+          drawerWidth,
 
         display: {
           xs: "none",
           md: "flex",
         },
 
-        flexDirection: "column",
+        flexDirection:
+          "column",
 
-        color: "#ffffff",
+        color:
+          "#ffffff",
 
-        bgcolor: "#172e5a",
-
-        borderRight:
-          "2px solid #2c8cff",
+        bgcolor:
+          "#172e5a",
 
         zIndex: 10,
       }}
@@ -177,9 +258,11 @@ export default function Sidebar({
 
           px: 2.5,
 
-          display: "flex",
+          display:
+            "flex",
 
-          alignItems: "center",
+          alignItems:
+            "center",
 
           gap: 1.5,
 
@@ -196,9 +279,11 @@ export default function Sidebar({
           sx={{
             fontSize: 18,
 
-            fontWeight: 700,
+            fontWeight:
+              700,
 
-            whiteSpace: "nowrap",
+            whiteSpace:
+              "nowrap",
           }}
         >
           卒業発表管理システム
@@ -206,7 +291,7 @@ export default function Sidebar({
       </Box>
 
       {/* ================================= */}
-      {/* メニュー */}
+      {/* Menu */}
       {/* ================================= */}
 
       <Box
@@ -214,9 +299,11 @@ export default function Sidebar({
         sx={{
           px: 1.5,
 
-          display: "flex",
+          display:
+            "flex",
 
-          flexDirection: "column",
+          flexDirection:
+            "column",
 
           gap: 0.5,
         }}
@@ -226,26 +313,189 @@ export default function Sidebar({
         {/* =============================== */}
 
         <Button
-          startIcon={<Home />}
+          fullWidth
+          startIcon={
+            <Home />
+          }
           onClick={() => {
-            navigate("/events");
+            navigate(
+              "/events",
+            );
           }}
           sx={menuButtonStyle(
-            isActive("/events"),
+            isActive(
+              "/events",
+            ),
           )}
         >
           ホーム
         </Button>
 
         {/* =============================== */}
-        {/* 発表会選択後のみ表示 */}
+        {/* pending */}
+        {/* =============================== */}
+
+        {profile.role ===
+          "pending" && (
+          <Button
+            fullWidth
+            startIcon={
+              <AssignmentInd />
+            }
+            onClick={() => {
+              navigate(
+                "/register",
+              );
+            }}
+            sx={menuButtonStyle(
+              location.pathname.startsWith(
+                "/register",
+              ),
+            )}
+          >
+            利用者登録
+          </Button>
+        )}
+
+        {/* =============================== */}
+        {/* student_pending */}
+        {/* =============================== */}
+
+        {profile.role ===
+          "student_pending" && (
+          <Button
+            fullWidth
+            startIcon={
+              <PendingActions />
+            }
+            onClick={() => {
+              navigate(
+                "/register/student",
+              );
+            }}
+            sx={menuButtonStyle(
+              isActive(
+                "/register/student",
+              ),
+            )}
+          >
+            学生登録申請状況
+          </Button>
+        )}
+
+        {/* =============================== */}
+        {/* teacher_pending */}
+        {/* =============================== */}
+
+        {profile.role ===
+          "teacher_pending" && (
+          <Button
+            fullWidth
+            startIcon={
+              <PendingActions />
+            }
+            onClick={() => {
+              navigate(
+                "/register/teacher",
+              );
+            }}
+            sx={menuButtonStyle(
+              isActive(
+                "/register/teacher",
+              ),
+            )}
+          >
+            教員申請状況
+          </Button>
+        )}
+
+        {/* =============================== */}
+        {/* 管理者 */}
+        {/* =============================== */}
+
+        {profile.role ===
+          "admin" && (
+          <>
+
+            {/* 学籍番号申請管理 */}
+
+            <Button
+              fullWidth
+              startIcon={
+                <HowToReg />
+              }
+              onClick={() => {
+                navigate(
+                  "/admin/students",
+                );
+              }}
+              sx={menuButtonStyle(
+                isActive(
+                  "/admin/students",
+                ),
+              )}
+            >
+              学籍番号申請管理
+            </Button>
+
+            {/* 教員申請管理 */}
+
+            <Button
+              fullWidth
+              startIcon={
+                <AdminPanelSettings />
+              }
+              onClick={() => {
+                navigate(
+                  "/admin/teachers",
+                );
+              }}
+              sx={menuButtonStyle(
+                isActive(
+                  "/admin/teachers",
+                ),
+              )}
+            >
+              教員申請管理
+            </Button>
+          </>
+        )}
+
+        {/* =============================== */}
+        {/* 発表会選択後 */}
         {/* =============================== */}
 
         {hasSelectedEvent && (
           <>
+            <Box
+              sx={{
+                mt: 2,
+                mb: 0.5,
+                px: 1.5,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 10,
+
+                  fontWeight:
+                    700,
+
+                  color:
+                    "rgba(255,255,255,0.5)",
+
+                  letterSpacing:
+                    1,
+                }}
+              >
+                発表会
+              </Typography>
+            </Box>
+
             {/* 発表一覧 */}
 
             <Button
+              fullWidth
               startIcon={
                 <Summarize />
               }
@@ -266,7 +516,10 @@ export default function Sidebar({
             {/* 学生一覧 */}
 
             <Button
-              startIcon={<People />}
+              fullWidth
+              startIcon={
+                <People />
+              }
               onClick={() => {
                 navigate(
                   `/events/${eventId}/students`,
@@ -280,31 +533,6 @@ export default function Sidebar({
             >
               学生一覧
             </Button>
-
-            {/*
-             * =================================
-             * 教員一覧
-             *
-             * 後で実装するため、
-             * 現在は非表示
-             * =================================
-             *
-             * <Button
-             *   startIcon={<School />}
-             *   onClick={() => {
-             *     navigate(
-             *       `/events/${eventId}/teachers`,
-             *     );
-             *   }}
-             *   sx={menuButtonStyle(
-             *     location.pathname.startsWith(
-             *       `/events/${eventId}/teachers`,
-             *     ),
-             *   )}
-             * >
-             *   教員一覧
-             * </Button>
-             */}
           </>
         )}
 
@@ -312,16 +540,28 @@ export default function Sidebar({
         {/* 設定 */}
         {/* =============================== */}
 
-        <Button
-          startIcon={<Settings />}
-          sx={menuButtonStyle(false)}
-        >
-          設定
-        </Button>
-      </Box>
+          <Button
+            fullWidth
+            startIcon={
+              <Settings />
+            }
+            onClick={() => {
+              navigate(
+                "/settings",
+              );
+            }}
+            sx={menuButtonStyle(
+              isActive(
+                "/settings",
+              ),
+            )}
+          >
+            設定
+          </Button>
+        </Box>
 
       {/* ================================= */}
-      {/* ユーザー情報 */}
+      {/* User */}
       {/* ================================= */}
 
       <Box
@@ -335,9 +575,11 @@ export default function Sidebar({
       >
         <Box
           sx={{
-            display: "flex",
+            display:
+              "flex",
 
-            alignItems: "center",
+            alignItems:
+              "center",
 
             gap: 1.5,
           }}
@@ -350,13 +592,17 @@ export default function Sidebar({
 
               height: 45,
 
-              bgcolor: "#6f92db",
+              bgcolor:
+                "#6f92db",
 
               border:
                 "1px solid rgba(255,255,255,0.2)",
             }}
           >
-            {userName.slice(0, 1)}
+            {userName.slice(
+              0,
+              1,
+            )}
           </Avatar>
 
           <Box
@@ -367,11 +613,14 @@ export default function Sidebar({
             <Typography
               noWrap
               sx={{
-                maxWidth: 145,
+                maxWidth:
+                  145,
 
-                fontSize: 11,
+                fontSize:
+                  11,
 
-                fontWeight: 700,
+                fontWeight:
+                  700,
               }}
             >
               {userName}
@@ -379,26 +628,31 @@ export default function Sidebar({
 
             <Typography
               sx={{
-                mt: 0.5,
+                mt: 0.25,
 
-                fontSize: 10,
+                fontSize: 12,
 
-                fontWeight: 700,
+                color:
+                  "rgba(255,255,255,0.65)",
               }}
             >
-              管理者
+              {roleLabel}
             </Typography>
           </Box>
         </Box>
 
         {/* =============================== */}
-        {/* ログアウト */}
+        {/* Logout */}
         {/* =============================== */}
 
         <Button
           fullWidth
-          startIcon={<Logout />}
-          onClick={onLogout}
+          startIcon={
+            <Logout />
+          }
+          onClick={() => {
+            void handleLogout();
+          }}
           sx={{
             mt: 2,
 
@@ -407,13 +661,16 @@ export default function Sidebar({
             justifyContent:
               "flex-start",
 
-            color: "#ffffff",
+            color:
+              "#ffffff",
 
             fontSize: 12,
 
-            fontWeight: 700,
+            fontWeight:
+              700,
 
-            textTransform: "none",
+            textTransform:
+              "none",
 
             "&:hover": {
               bgcolor:

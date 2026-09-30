@@ -6,10 +6,6 @@ import type {
   ReactNode,
 } from "react";
 
-import type {
-  Session,
-} from "@supabase/supabase-js";
-
 import {
   Box,
   Button,
@@ -28,41 +24,74 @@ import Sidebar, {
   drawerWidth,
 } from "../components/Sidebar";
 
-import { supabase } from "../lib/supabase";
+import {
+  useAuthContext,
+} from "../hooks/useAuthContext";
+
+import {
+  supabase,
+} from "../lib/supabase";
 
 import type {
   PresentationFormData,
 } from "../types/presentationForm";
 
-type PresentationConfirmPageProps = {
-  session: Session;
-};
+/*
+ * ========================================
+ * Location State
+ * ========================================
+ */
 
 type LocationState = {
   form?: PresentationFormData;
 };
 
-export default function PresentationConfirmPage({
-  session,
-}: PresentationConfirmPageProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
+/*
+ * ========================================
+ * PresentationConfirmPage
+ * ========================================
+ */
+
+export default function PresentationConfirmPage() {
+  const navigate =
+    useNavigate();
+
+  const location =
+    useLocation();
 
   /*
+   * ========================================
+   * AuthContext
+   * ========================================
+   */
+
+  const {
+    session,
+  } = useAuthContext();
+
+  /*
+   * ========================================
    * URL
+   * ========================================
    *
    * /events/:eventId/presentations/confirm
    *
    * からeventIdを取得
    */
-  const { eventId } = useParams<{
+
+  const {
+    eventId,
+  } = useParams<{
     eventId: string;
   }>();
 
   /*
+   * ========================================
    * PresentationCreatePageから
    * 渡された入力内容を取得
+   * ========================================
    */
+
   const locationState =
     location.state as
       | LocationState
@@ -72,16 +101,16 @@ export default function PresentationConfirmPage({
     locationState?.form;
 
   /*
-   * 登録処理中
+   * ========================================
+   * State
+   * ========================================
    */
+
   const [
     isSubmitting,
     setIsSubmitting,
   ] = useState(false);
 
-  /*
-   * 登録エラー
-   */
   const [
     errorMessage,
     setErrorMessage,
@@ -92,9 +121,16 @@ export default function PresentationConfirmPage({
    * 入力内容を修正
    * ========================================
    */
+
   const handleEdit = () => {
-    if (!eventId || !form) {
-      navigate("/events");
+    if (
+      !eventId ||
+      !form
+    ) {
+      navigate(
+        "/events",
+      );
+
       return;
     }
 
@@ -102,6 +138,7 @@ export default function PresentationConfirmPage({
      * 入力内容をstateで渡したまま
      * 新規登録画面へ戻る
      */
+
     navigate(
       `/events/${eventId}/presentations/new`,
       {
@@ -117,18 +154,25 @@ export default function PresentationConfirmPage({
    * Supabaseへ登録
    * ========================================
    */
+
   const handleRegister =
     async () => {
       if (
         !eventId ||
         !form ||
+        !session ||
         isSubmitting
       ) {
         return;
       }
 
-      setIsSubmitting(true);
-      setErrorMessage("");
+      setIsSubmitting(
+        true,
+      );
+
+      setErrorMessage(
+        "",
+      );
 
       try {
         /*
@@ -136,16 +180,24 @@ export default function PresentationConfirmPage({
          * presentationsへ登録
          * ----------------------------------
          */
+
         const {
-          data: presentation,
-          error: presentationError,
+          data:
+            presentation,
+
+          error:
+            presentationError,
         } = await supabase
-          .from("presentations")
+          .from(
+            "presentations",
+          )
           .insert({
             /*
              * どの発表会に所属するか
              */
-            event_id: eventId,
+
+            event_id:
+              eventId,
 
             seminar_name:
               form.seminarName.trim(),
@@ -169,13 +221,22 @@ export default function PresentationConfirmPage({
             /*
              * 登録したユーザー
              */
+
             owner:
               session.user.id,
           })
-          .select("id")
+          .select(
+            "id",
+          )
           .single();
 
-        if (presentationError) {
+        /*
+         * presentations登録失敗
+         */
+
+        if (
+          presentationError
+        ) {
           console.error(
             "発表登録エラー:",
             presentationError,
@@ -186,7 +247,13 @@ export default function PresentationConfirmPage({
           );
         }
 
-        if (!presentation) {
+        /*
+         * IDを取得できなかった場合
+         */
+
+        if (
+          !presentation
+        ) {
           throw new Error(
             "登録した発表のIDを取得できませんでした。",
           );
@@ -197,9 +264,12 @@ export default function PresentationConfirmPage({
          * presentersへ学籍番号を登録
          * ----------------------------------
          */
+
         const presenterRows =
           form.presenters.map(
-            (studentNumber) => ({
+            (
+              studentNumber,
+            ) => ({
               presentation_id:
                 presentation.id,
 
@@ -211,17 +281,23 @@ export default function PresentationConfirmPage({
           );
 
         if (
-          presenterRows.length > 0
+          presenterRows.length >
+          0
         ) {
           const {
-            error: presentersError,
+            error:
+              presentersError,
           } = await supabase
-            .from("presenters")
+            .from(
+              "presenters",
+            )
             .insert(
               presenterRows,
             );
 
-          if (presentersError) {
+          if (
+            presentersError
+          ) {
             console.error(
               "発表者登録エラー:",
               presentersError,
@@ -237,23 +313,29 @@ export default function PresentationConfirmPage({
          * ----------------------------------
          * 登録成功
          *
-         * 選択中の発表会の一覧へ戻る
+         * 選択中の発表会の
+         * 発表一覧へ戻る
          * ----------------------------------
          */
+
         navigate(
           `/events/${eventId}/presentations`,
           {
-            replace: true,
+            replace:
+              true,
           },
         );
-      } catch (error) {
+      } catch (
+        error
+      ) {
         console.error(
           "登録処理エラー:",
           error,
         );
 
         if (
-          error instanceof Error
+          error instanceof
+          Error
         ) {
           setErrorMessage(
             error.message,
@@ -264,33 +346,33 @@ export default function PresentationConfirmPage({
           );
         }
       } finally {
-        setIsSubmitting(false);
-      }
-    };
-
-  /*
-   * ========================================
-   * ログアウト
-   * ========================================
-   */
-  const handleLogout =
-    async () => {
-      const { error } =
-        await supabase.auth.signOut();
-
-      if (error) {
-        console.error(
-          "ログアウトエラー:",
-          error,
+        setIsSubmitting(
+          false,
         );
       }
     };
 
   /*
    * ========================================
+   * ログイン情報がない
+   * ========================================
+   */
+
+  if (!session) {
+    return (
+      <Navigate
+        to="/"
+        replace
+      />
+    );
+  }
+
+  /*
+   * ========================================
    * eventIdがない
    * ========================================
    */
+
   if (!eventId) {
     return (
       <Navigate
@@ -308,6 +390,7 @@ export default function PresentationConfirmPage({
    * confirmへ来た場合など
    * ========================================
    */
+
   if (!form) {
     return (
       <Navigate
@@ -317,23 +400,27 @@ export default function PresentationConfirmPage({
     );
   }
 
+  /*
+   * ========================================
+   * Render
+   * ========================================
+   */
+
   return (
     <Box
       sx={{
-        minHeight: "100vh",
-        bgcolor: "#ffffff",
+        minHeight:
+          "100vh",
+
+        bgcolor:
+          "#ffffff",
       }}
     >
       {/* ================================= */}
       {/* Sidebar */}
       {/* ================================= */}
 
-      <Sidebar
-        session={session}
-        onLogout={() => {
-          void handleLogout();
-        }}
-      />
+      <Sidebar />
 
       {/* ================================= */}
       {/* Main */}
@@ -342,19 +429,23 @@ export default function PresentationConfirmPage({
       <Box
         component="main"
         sx={{
-          minHeight: "100vh",
+          minHeight:
+            "100vh",
 
           ml: {
             xs: 0,
+
             md: `${drawerWidth}px`,
           },
         }}
       >
         <Box
           sx={{
-            width: "100%",
+            width:
+              "100%",
 
-            maxWidth: 1000,
+            maxWidth:
+              1000,
 
             px: {
               xs: 2,
@@ -363,6 +454,7 @@ export default function PresentationConfirmPage({
             },
 
             pt: 4,
+
             pb: 5,
           }}
         >
@@ -375,11 +467,14 @@ export default function PresentationConfirmPage({
             sx={{
               mb: 1,
 
-              fontSize: 22,
+              fontSize:
+                22,
 
-              fontWeight: 700,
+              fontWeight:
+                700,
 
-              color: "#333333",
+              color:
+                "#333333",
             }}
           >
             発表登録内容の確認
@@ -389,9 +484,11 @@ export default function PresentationConfirmPage({
             sx={{
               mb: 4,
 
-              color: "#777777",
+              color:
+                "#777777",
 
-              fontSize: 13,
+              fontSize:
+                13,
             }}
           >
             以下の内容で登録します。
@@ -403,16 +500,20 @@ export default function PresentationConfirmPage({
 
           <Box
             sx={{
-              width: "100%",
+              width:
+                "100%",
 
               border:
                 "1px solid #dddddd",
 
-              borderRadius: 2,
+              borderRadius:
+                2,
 
-              bgcolor: "#ffffff",
+              bgcolor:
+                "#ffffff",
 
-              overflow: "hidden",
+              overflow:
+                "hidden",
 
               boxShadow:
                 "0 2px 6px rgba(0,0,0,0.06)",
@@ -427,12 +528,16 @@ export default function PresentationConfirmPage({
 
             <ConfirmItem
               label="タイトル"
-              value={form.title}
+              value={
+                form.title
+              }
             />
 
             <ConfirmItem
               label="発表概要"
-              value={form.summary}
+              value={
+                form.summary
+              }
               multiline
             />
 
@@ -455,8 +560,9 @@ export default function PresentationConfirmPage({
             <ConfirmItem
               label="発表者（学籍番号）"
               value={
-                form.presenters
-                  .join("、")
+                form.presenters.join(
+                  "、",
+                )
               }
               isLast
             />
@@ -475,10 +581,13 @@ export default function PresentationConfirmPage({
                 color:
                   "error.main",
 
-                fontSize: 13,
+                fontSize:
+                  13,
               }}
             >
-              {errorMessage}
+              {
+                errorMessage
+              }
             </Typography>
           )}
 
@@ -490,11 +599,15 @@ export default function PresentationConfirmPage({
             sx={{
               mt: 4,
 
-              display: "flex",
+              display:
+                "flex",
 
               flexDirection: {
-                xs: "column-reverse",
-                sm: "row",
+                xs:
+                  "column-reverse",
+
+                sm:
+                  "row",
               },
 
               justifyContent:
@@ -507,33 +620,36 @@ export default function PresentationConfirmPage({
 
             <Button
               type="button"
-
               variant="outlined"
-
               disabled={
                 isSubmitting
               }
-
               onClick={
                 handleEdit
               }
-
               sx={{
                 width: {
-                  xs: "100%",
-                  sm: 160,
+                  xs:
+                    "100%",
+
+                  sm:
+                    160,
                 },
 
-                height: 44,
+                height:
+                  44,
 
-                color: "#333333",
+                color:
+                  "#333333",
 
                 borderColor:
                   "#bdbdbd",
 
-                fontSize: 13,
+                fontSize:
+                  13,
 
-                fontWeight: 700,
+                fontWeight:
+                  700,
 
                 textTransform:
                   "none",
@@ -541,13 +657,14 @@ export default function PresentationConfirmPage({
                 boxShadow:
                   "0 2px 4px rgba(0,0,0,0.08)",
 
-                "&:hover": {
-                  borderColor:
-                    "#999999",
+                "&:hover":
+                  {
+                    borderColor:
+                      "#999999",
 
-                  bgcolor:
-                    "#fafafa",
-                },
+                    bgcolor:
+                      "#fafafa",
+                  },
               }}
             >
               入力内容を修正
@@ -557,31 +674,33 @@ export default function PresentationConfirmPage({
 
             <Button
               type="button"
-
               variant="contained"
-
               disabled={
                 isSubmitting
               }
-
               onClick={() => {
                 void handleRegister();
               }}
-
               sx={{
                 width: {
-                  xs: "100%",
-                  sm: 160,
+                  xs:
+                    "100%",
+
+                  sm:
+                    160,
                 },
 
-                height: 44,
+                height:
+                  44,
 
                 bgcolor:
                   "#172e5a",
 
-                fontSize: 13,
+                fontSize:
+                  13,
 
-                fontWeight: 700,
+                fontWeight:
+                  700,
 
                 textTransform:
                   "none",
@@ -589,15 +708,18 @@ export default function PresentationConfirmPage({
                 boxShadow:
                   "0 2px 5px rgba(0,0,0,0.15)",
 
-                "&:hover": {
-                  bgcolor:
-                    "#102447",
-                },
+                "&:hover":
+                  {
+                    bgcolor:
+                      "#102447",
+                  },
               }}
             >
               {isSubmitting ? (
                 <CircularProgress
-                  size={22}
+                  size={
+                    22
+                  }
                   color="inherit"
                 />
               ) : (
@@ -618,11 +740,17 @@ export default function PresentationConfirmPage({
  */
 
 type ConfirmItemProps = {
-  label: string;
-  value: ReactNode;
+  label:
+    string;
 
-  multiline?: boolean;
-  isLast?: boolean;
+  value:
+    ReactNode;
+
+  multiline?:
+    boolean;
+
+  isLast?:
+    boolean;
 };
 
 function ConfirmItem({
@@ -634,12 +762,17 @@ function ConfirmItem({
   return (
     <Box
       sx={{
-        display: "grid",
+        display:
+          "grid",
 
-        gridTemplateColumns: {
-          xs: "1fr",
-          sm: "220px 1fr",
-        },
+        gridTemplateColumns:
+          {
+            xs:
+              "1fr",
+
+            sm:
+              "220px 1fr",
+          },
 
         borderBottom:
           isLast
@@ -652,6 +785,7 @@ function ConfirmItem({
       <Box
         sx={{
           px: 2,
+
           py: 2,
 
           bgcolor:
@@ -660,9 +794,11 @@ function ConfirmItem({
       >
         <Typography
           sx={{
-            fontSize: 13,
+            fontSize:
+              13,
 
-            fontWeight: 700,
+            fontWeight:
+              700,
 
             color:
               "#333333",
@@ -677,14 +813,17 @@ function ConfirmItem({
       <Box
         sx={{
           px: 2,
+
           py: 2,
 
-          minWidth: 0,
+          minWidth:
+            0,
         }}
       >
         <Typography
           sx={{
-            fontSize: 13,
+            fontSize:
+              13,
 
             color:
               "#333333",
