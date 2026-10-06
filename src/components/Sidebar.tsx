@@ -513,6 +513,15 @@ export default function Sidebar() {
               発表一覧
             </Button>
 
+            <Button
+              fullWidth
+              startIcon={<Summarize />}
+              onClick={() => navigate(`/events/${eventId}/program`)}
+              sx={menuButtonStyle(location.pathname === `/events/${eventId}/program`)}
+            >
+              発表プログラム
+            </Button>
+
             {/* 学生一覧 */}
 
             <Button

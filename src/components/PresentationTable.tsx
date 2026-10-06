@@ -13,9 +13,8 @@ import type { Presentation } from "../types/presentation";
 
 type PresentationTableProps = {
   rows: Presentation[];
-
-  // ページングしたときも番号を連番にするため
   startIndex: number;
+  onRowClick?: (presentationId: string) => void;
 };
 
 const tableHeadCellStyle = {
@@ -39,6 +38,7 @@ const tableBodyCellStyle = {
 export default function PresentationTable({
   rows,
   startIndex,
+  onRowClick,
 }: PresentationTableProps) {
   return (
     <TableContainer
@@ -90,8 +90,19 @@ export default function PresentationTable({
               <TableRow
                 key={row.id}
                 hover
+                onClick={() => {
+                  onRowClick?.(row.id);
+                }}
                 sx={{
-                  cursor: "pointer",
+                  cursor: onRowClick
+                    ? "pointer"
+                    : "default",
+
+                  "&:hover": {
+                    bgcolor: onRowClick
+                      ? "#f5f7fb"
+                      : "inherit",
+                  },
 
                   "&:last-child td": {
                     borderBottom: 0,
@@ -110,11 +121,11 @@ export default function PresentationTable({
                 <TableCell sx={tableBodyCellStyle}>
                   {row.presenters.length > 0 ? (
                     row.presenters
-                    .map(
-                      (presenter) =>
-                        presenter.student_number,
-                    )
-                    .join("、")
+                      .map(
+                        (presenter) =>
+                          presenter.student_number,
+                      )
+                      .join("、")
                   ) : (
                     <Typography
                       component="span"

@@ -1,143 +1,87 @@
+import { useState } from "react";
+import type { ReactNode } from "react";
 import {
-  useState,
-} from "react";
-
-import type {
-  ReactNode,
-} from "react";
-
-import {
+  Alert,
   Box,
   Button,
   CircularProgress,
   Typography,
 } from "@mui/material";
-
 import {
   Navigate,
   useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 
-import Sidebar, {
-  drawerWidth,
-} from "../components/Sidebar";
-
-import {
-  useAuthContext,
-} from "../hooks/useAuthContext";
-
-import {
-  supabase,
-} from "../lib/supabase";
-
-import type {
-  PresentationFormData,
-} from "../types/presentationForm";
-
-/*
- * ========================================
- * Location State
- * ========================================
- */
+import Sidebar, { drawerWidth } from "../components/Sidebar";
+import { useAuthContext } from "../hooks/useAuthContext";
+import { supabase } from "../lib/supabase";
+import type { PresentationFormData } from "../types/presentationForm";
+import "../styles/markdown.css";
 
 type LocationState = {
   form?: PresentationFormData;
 };
 
-/*
- * ========================================
- * PresentationConfirmPage
- * ========================================
- */
-
 export default function PresentationConfirmPage() {
-  const navigate =
-    useNavigate();
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const location =
-    useLocation();
-
-  /*
-   * ========================================
-   * AuthContext
-   * ========================================
-   */
-
-  const {
-    session,
-  } = useAuthContext();
-
-  /*
-   * ========================================
-   * URL
-   * ========================================
-   *
-   * /events/:eventId/presentations/confirm
-   *
-   * からeventIdを取得
-   */
-
-  const {
-    eventId,
-  } = useParams<{
+  const { eventId } = useParams<{
     eventId: string;
   }>();
 
-  /*
-   * ========================================
-   * PresentationCreatePageから
-   * 渡された入力内容を取得
-   * ========================================
-   */
+  const { session, profile } = useAuthContext();
 
   const locationState =
-    location.state as
-      | LocationState
-      | null;
+    location.state as LocationState | null;
 
-  const form =
-    locationState?.form;
+  const form = locationState?.form;
 
-  /*
-   * ========================================
-   * State
-   * ========================================
-   */
+  const [isSubmitting, setIsSubmitting] =
+    useState(false);
 
-  const [
-    isSubmitting,
-    setIsSubmitting,
-  ] = useState(false);
-
-  const [
-    errorMessage,
-    setErrorMessage,
-  ] = useState("");
+  const [errorMessage, setErrorMessage] =
+    useState("");
 
   /*
-   * ========================================
-   * 入力内容を修正
-   * ========================================
+   * 学生本人の学籍番号
    */
+  const ownStudentNumber =
+    profile?.student_number?.trim().toUpperCase() ?? "";
+
+  /*
+   * 実際に登録する発表者一覧
+   *
+   * student
+   *   本人 + 共同発表者
+   *
+   * teacher / admin
+   *   form.presenters
+   */
+  const presenterStudentNumbers = form
+    ? [
+        ...new Set([
+          ...(ownStudentNumber
+            ? [ownStudentNumber]
+            : []),
+          ...form.presenters.map((presenter) =>
+            presenter.trim().toUpperCase(),
+          ),
+        ]),
+      ].filter(Boolean)
+    : [];
 
   const handleEdit = () => {
-    if (
-      !eventId ||
-      !form
-    ) {
-      navigate(
-        "/events",
-      );
-
+    if (!eventId || !form) {
+      navigate("/events");
       return;
     }
-
-    /*
-     * 入力内容をstateで渡したまま
-     * 新規登録画面へ戻る
-     */
 
     navigate(
       `/events/${eventId}/presentations/new`,
@@ -149,214 +93,120 @@ export default function PresentationConfirmPage() {
     );
   };
 
-  /*
-   * ========================================
-   * Supabaseへ登録
-   * ========================================
-   */
+  const handleRegister = async () => {
+    if (
+      !eventId ||
+      !form ||
+      !session ||
+      isSubmitting
+    ) {
+      return;
+    }
 
-  const handleRegister =
-    async () => {
-      if (
-        !eventId ||
-        !form ||
-        !session ||
-        isSubmitting
-      ) {
-        return;
-      }
+    setIsSubmitting(true);
+    setErrorMessage("");
 
-      setIsSubmitting(
-        true,
-      );
+    try {
+      /*
+       * presentationsへ登録
+       */
+      const {
+        data: presentation,
+        error: presentationError,
+      } = await supabase
+        .from("presentations")
+        .insert({
+          event_id: eventId,
+          seminar_name: form.seminarName.trim(),
+          title: form.title.trim(),
+          summary: form.summary,
+          material_url:
+            form.documentUrl.trim() || null,
+          github_url:
+            form.repositoryUrl.trim() || null,
+          owner: session.user.id,
+        })
+        .select("id")
+        .single();
 
-      setErrorMessage(
-        "",
-      );
-
-      try {
-        /*
-         * ----------------------------------
-         * presentationsへ登録
-         * ----------------------------------
-         */
-
-        const {
-          data:
-            presentation,
-
-          error:
-            presentationError,
-        } = await supabase
-          .from(
-            "presentations",
-          )
-          .insert({
-            /*
-             * どの発表会に所属するか
-             */
-
-            event_id:
-              eventId,
-
-            seminar_name:
-              form.seminarName.trim(),
-
-            title:
-              form.title.trim(),
-
-            summary:
-              form.summary.trim(),
-
-            material_url:
-              form.documentUrl.trim()
-                ? form.documentUrl.trim()
-                : null,
-
-            github_url:
-              form.repositoryUrl.trim()
-                ? form.repositoryUrl.trim()
-                : null,
-
-            /*
-             * 登録したユーザー
-             */
-
-            owner:
-              session.user.id,
-          })
-          .select(
-            "id",
-          )
-          .single();
-
-        /*
-         * presentations登録失敗
-         */
-
-        if (
-          presentationError
-        ) {
-          console.error(
-            "発表登録エラー:",
-            presentationError,
-          );
-
-          throw new Error(
-            "発表情報を登録できませんでした。",
-          );
-        }
-
-        /*
-         * IDを取得できなかった場合
-         */
-
-        if (
-          !presentation
-        ) {
-          throw new Error(
-            "登録した発表のIDを取得できませんでした。",
-          );
-        }
-
-        /*
-         * ----------------------------------
-         * presentersへ学籍番号を登録
-         * ----------------------------------
-         */
-
-        const presenterRows =
-          form.presenters.map(
-            (
-              studentNumber,
-            ) => ({
-              presentation_id:
-                presentation.id,
-
-              student_number:
-                studentNumber
-                  .trim()
-                  .toUpperCase(),
-            }),
-          );
-
-        if (
-          presenterRows.length >
-          0
-        ) {
-          const {
-            error:
-              presentersError,
-          } = await supabase
-            .from(
-              "presenters",
-            )
-            .insert(
-              presenterRows,
-            );
-
-          if (
-            presentersError
-          ) {
-            console.error(
-              "発表者登録エラー:",
-              presentersError,
-            );
-
-            throw new Error(
-              "発表者情報を登録できませんでした。",
-            );
-          }
-        }
-
-        /*
-         * ----------------------------------
-         * 登録成功
-         *
-         * 選択中の発表会の
-         * 発表一覧へ戻る
-         * ----------------------------------
-         */
-
-        navigate(
-          `/events/${eventId}/presentations`,
-          {
-            replace:
-              true,
-          },
-        );
-      } catch (
-        error
-      ) {
+      if (presentationError) {
         console.error(
-          "登録処理エラー:",
-          error,
+          "発表登録エラー:",
+          presentationError,
         );
 
-        if (
-          error instanceof
-          Error
-        ) {
-          setErrorMessage(
-            error.message,
-          );
-        } else {
-          setErrorMessage(
-            "登録中にエラーが発生しました。",
-          );
-        }
-      } finally {
-        setIsSubmitting(
-          false,
+        throw new Error(
+          "発表情報を登録できませんでした。",
         );
       }
-    };
 
-  /*
-   * ========================================
-   * ログイン情報がない
-   * ========================================
-   */
+      if (!presentation) {
+        throw new Error(
+          "登録した発表のIDを取得できませんでした。",
+        );
+      }
+
+      /*
+       * presentersへ登録
+       *
+       * 学生の場合は本人の学籍番号も含む。
+       */
+      const presenterRows =
+        presenterStudentNumbers.map(
+          (studentNumber) => ({
+            presentation_id:
+              presentation.id,
+            student_number:
+              studentNumber,
+          }),
+        );
+
+      if (presenterRows.length > 0) {
+        const { error: presentersError } =
+          await supabase
+            .from("presenters")
+            .insert(presenterRows);
+
+        if (presentersError) {
+          console.error(
+            "発表者登録エラー:",
+            presentersError,
+          );
+
+          throw new Error(
+            "発表者情報を登録できませんでした。",
+          );
+        }
+      }
+
+      /*
+       * 登録成功
+       */
+      navigate(
+        `/events/${eventId}/presentations`,
+        {
+          replace: true,
+        },
+      );
+    } catch (error) {
+      console.error(
+        "登録処理エラー:",
+        error,
+      );
+
+      if (error instanceof Error) {
+        setErrorMessage(
+          error.message,
+        );
+      } else {
+        setErrorMessage(
+          "登録中にエラーが発生しました。",
+        );
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   if (!session) {
     return (
@@ -367,12 +217,6 @@ export default function PresentationConfirmPage() {
     );
   }
 
-  /*
-   * ========================================
-   * eventIdがない
-   * ========================================
-   */
-
   if (!eventId) {
     return (
       <Navigate
@@ -381,15 +225,6 @@ export default function PresentationConfirmPage() {
       />
     );
   }
-
-  /*
-   * ========================================
-   * 入力データがない
-   *
-   * URLを直接入力して
-   * confirmへ来た場合など
-   * ========================================
-   */
 
   if (!form) {
     return (
@@ -400,326 +235,316 @@ export default function PresentationConfirmPage() {
     );
   }
 
-  /*
-   * ========================================
-   * Render
-   * ========================================
-   */
-
   return (
     <Box
       sx={{
-        minHeight:
-          "100vh",
-
-        bgcolor:
-          "#ffffff",
+        minHeight: "100vh",
+        bgcolor: "#f7f8fa",
       }}
     >
-      {/* ================================= */}
-      {/* Sidebar */}
-      {/* ================================= */}
-
       <Sidebar />
-
-      {/* ================================= */}
-      {/* Main */}
-      {/* ================================= */}
 
       <Box
         component="main"
         sx={{
-          minHeight:
-            "100vh",
-
           ml: {
             xs: 0,
-
             md: `${drawerWidth}px`,
           },
+          minHeight: "100vh",
         }}
       >
         <Box
           sx={{
-            width:
-              "100%",
-
-            maxWidth:
-              1000,
-
+            width: "100%",
+            maxWidth: 1100,
             px: {
               xs: 2,
               sm: 3,
-              md: 4.5,
+              md: 4,
             },
-
-            pt: 4,
-
-            pb: 5,
+            py: 4,
           }}
         >
-          {/* ================================= */}
-          {/* タイトル */}
-          {/* ================================= */}
+          <Box sx={{ mb: 3 }}>
+            <Typography
+              component="h1"
+              sx={{
+                fontSize: {
+                  xs: 24,
+                  md: 28,
+                },
+                fontWeight: 700,
+                color: "#222222",
+              }}
+            >
+              発表登録内容の確認
+            </Typography>
 
-          <Typography
-            component="h1"
-            sx={{
-              mb: 1,
-
-              fontSize:
-                22,
-
-              fontWeight:
-                700,
-
-              color:
-                "#333333",
-            }}
-          >
-            発表登録内容の確認
-          </Typography>
-
-          <Typography
-            sx={{
-              mb: 4,
-
-              color:
-                "#777777",
-
-              fontSize:
-                13,
-            }}
-          >
-            以下の内容で登録します。
-          </Typography>
-
-          {/* ================================= */}
-          {/* 確認内容 */}
-          {/* ================================= */}
+            <Typography
+              sx={{
+                mt: 0.8,
+                color: "text.secondary",
+                fontSize: 13,
+              }}
+            >
+              以下の内容で発表を登録します。
+            </Typography>
+          </Box>
 
           <Box
             sx={{
-              width:
-                "100%",
-
-              border:
-                "1px solid #dddddd",
-
-              borderRadius:
-                2,
-
-              bgcolor:
-                "#ffffff",
-
-              overflow:
-                "hidden",
-
-              boxShadow:
-                "0 2px 6px rgba(0,0,0,0.06)",
+              width: "100%",
+              border: "1px solid #dddddd",
+              borderRadius: 2,
+              bgcolor: "#ffffff",
+              overflow: "hidden",
             }}
           >
             <ConfirmItem
               label="ゼミ名（教員名）"
-              value={
-                form.seminarName
-              }
+              value={form.seminarName}
             />
 
             <ConfirmItem
               label="タイトル"
-              value={
-                form.title
-              }
+              value={form.title}
             />
 
             <ConfirmItem
               label="発表概要"
-              value={
-                form.summary
-              }
-              multiline
-            />
+            >
+              {form.summary.trim() ? (
+                <Box className="markdown-content">
+                  <ReactMarkdown
+                    remarkPlugins={[
+                      remarkGfm,
+                    ]}
+                    rehypePlugins={[
+                      rehypeRaw,
+                      rehypeSanitize,
+                    ]}
+                  >
+                    {form.summary}
+                  </ReactMarkdown>
+                </Box>
+              ) : (
+                <Typography
+                  sx={{
+                    color:
+                      "text.secondary",
+                    fontSize: 13,
+                  }}
+                >
+                  未入力
+                </Typography>
+              )}
+            </ConfirmItem>
 
             <ConfirmItem
               label="資料等へのリンク"
-              value={
-                form.documentUrl ||
-                "未設定"
-              }
-            />
+            >
+              {form.documentUrl ? (
+                <Typography
+                  component="a"
+                  href={
+                    form.documentUrl
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    color: "#1756a9",
+                    fontSize: 13,
+                    overflowWrap:
+                      "anywhere",
+                  }}
+                >
+                  {form.documentUrl}
+                </Typography>
+              ) : (
+                <Typography
+                  sx={{
+                    color:
+                      "text.secondary",
+                    fontSize: 13,
+                  }}
+                >
+                  未設定
+                </Typography>
+              )}
+            </ConfirmItem>
 
             <ConfirmItem
               label="Gitリポジトリへのリンク"
-              value={
-                form.repositoryUrl ||
-                "未設定"
-              }
-            />
+            >
+              {form.repositoryUrl ? (
+                <Typography
+                  component="a"
+                  href={
+                    form.repositoryUrl
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  sx={{
+                    color: "#1756a9",
+                    fontSize: 13,
+                    overflowWrap:
+                      "anywhere",
+                  }}
+                >
+                  {form.repositoryUrl}
+                </Typography>
+              ) : (
+                <Typography
+                  sx={{
+                    color:
+                      "text.secondary",
+                    fontSize: 13,
+                  }}
+                >
+                  未設定
+                </Typography>
+              )}
+            </ConfirmItem>
 
             <ConfirmItem
               label="発表者（学籍番号）"
-              value={
-                form.presenters.join(
-                  "、",
-                )
-              }
               isLast
-            />
+            >
+              {presenterStudentNumbers.length >
+              0 ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 1,
+                  }}
+                >
+                  {presenterStudentNumbers.map(
+                    (studentNumber) => (
+                      <Box
+                        key={
+                          studentNumber
+                        }
+                        sx={{
+                          px: 1.2,
+                          py: 0.7,
+                          bgcolor:
+                            "#f0f2f6",
+                          border:
+                            "1px solid #d9dde5",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <Typography
+                          sx={{
+                            color:
+                              "#333333",
+                            fontSize: 12,
+                            fontWeight: 600,
+                          }}
+                        >
+                          {
+                            studentNumber
+                          }
+                          {studentNumber ===
+                            ownStudentNumber &&
+                            "（あなた）"}
+                        </Typography>
+                      </Box>
+                    ),
+                  )}
+                </Box>
+              ) : (
+                <Typography
+                  sx={{
+                    color:
+                      "text.secondary",
+                    fontSize: 13,
+                  }}
+                >
+                  発表者なし
+                </Typography>
+              )}
+            </ConfirmItem>
           </Box>
 
-          {/* ================================= */}
-          {/* エラー */}
-          {/* ================================= */}
-
           {errorMessage && (
-            <Typography
-              role="alert"
-              sx={{
-                mt: 2,
-
-                color:
-                  "error.main",
-
-                fontSize:
-                  13,
-              }}
+            <Alert
+              severity="error"
+              sx={{ mt: 2 }}
             >
-              {
-                errorMessage
-              }
-            </Typography>
+              {errorMessage}
+            </Alert>
           )}
-
-          {/* ================================= */}
-          {/* ボタン */}
-          {/* ================================= */}
 
           <Box
             sx={{
               mt: 4,
-
-              display:
-                "flex",
-
+              display: "flex",
               flexDirection: {
-                xs:
-                  "column-reverse",
-
-                sm:
-                  "row",
+                xs: "column-reverse",
+                sm: "row",
               },
-
               justifyContent:
                 "flex-end",
-
               gap: 1.5,
             }}
           >
-            {/* 入力内容を修正 */}
-
             <Button
               type="button"
               variant="outlined"
-              disabled={
-                isSubmitting
-              }
-              onClick={
-                handleEdit
-              }
+              disabled={isSubmitting}
+              onClick={handleEdit}
               sx={{
                 width: {
-                  xs:
-                    "100%",
-
-                  sm:
-                    160,
+                  xs: "100%",
+                  sm: 160,
                 },
-
-                height:
-                  44,
-
-                color:
-                  "#333333",
-
+                height: 44,
+                color: "#555555",
                 borderColor:
-                  "#bdbdbd",
-
-                fontSize:
-                  13,
-
-                fontWeight:
-                  700,
-
+                  "#bbbbbb",
+                fontWeight: 700,
                 textTransform:
                   "none",
-
-                boxShadow:
-                  "0 2px 4px rgba(0,0,0,0.08)",
-
-                "&:hover":
-                  {
-                    borderColor:
-                      "#999999",
-
-                    bgcolor:
-                      "#fafafa",
-                  },
+                "&:hover": {
+                  borderColor:
+                    "#999999",
+                  bgcolor:
+                    "#fafafa",
+                },
               }}
             >
               入力内容を修正
             </Button>
 
-            {/* 登録 */}
-
             <Button
               type="button"
               variant="contained"
-              disabled={
-                isSubmitting
-              }
+              disabled={isSubmitting}
               onClick={() => {
                 void handleRegister();
               }}
               sx={{
                 width: {
-                  xs:
-                    "100%",
-
-                  sm:
-                    160,
+                  xs: "100%",
+                  sm: 160,
                 },
-
-                height:
-                  44,
-
-                bgcolor:
-                  "#172e5a",
-
-                fontSize:
-                  13,
-
-                fontWeight:
-                  700,
-
+                height: 44,
+                bgcolor: "#172e5a",
+                fontWeight: 700,
                 textTransform:
                   "none",
-
-                boxShadow:
-                  "0 2px 5px rgba(0,0,0,0.15)",
-
-                "&:hover":
-                  {
-                    bgcolor:
-                      "#102447",
-                  },
+                "&:hover": {
+                  bgcolor:
+                    "#102447",
+                },
               }}
             >
               {isSubmitting ? (
                 <CircularProgress
-                  size={
-                    22
-                  }
+                  size={22}
                   color="inherit"
                 />
               ) : (
@@ -733,112 +558,71 @@ export default function PresentationConfirmPage() {
   );
 }
 
-/*
- * ==========================================
- * 確認項目
- * ==========================================
- */
-
 type ConfirmItemProps = {
-  label:
-    string;
-
-  value:
-    ReactNode;
-
-  multiline?:
-    boolean;
-
-  isLast?:
-    boolean;
+  label: string;
+  value?: ReactNode;
+  children?: ReactNode;
+  isLast?: boolean;
 };
 
 function ConfirmItem({
   label,
   value,
-  multiline = false,
+  children,
   isLast = false,
 }: ConfirmItemProps) {
   return (
     <Box
       sx={{
-        display:
-          "grid",
-
-        gridTemplateColumns:
-          {
-            xs:
-              "1fr",
-
-            sm:
-              "220px 1fr",
-          },
-
+        display: "grid",
+        gridTemplateColumns: {
+          xs: "1fr",
+          sm: "220px minmax(0, 1fr)",
+        },
         borderBottom:
           isLast
             ? "none"
             : "1px solid #eeeeee",
       }}
     >
-      {/* ラベル */}
-
       <Box
         sx={{
           px: 2,
-
           py: 2,
-
-          bgcolor:
-            "#f7f8fa",
+          bgcolor: "#f7f8fa",
         }}
       >
         <Typography
           sx={{
-            fontSize:
-              13,
-
-            fontWeight:
-              700,
-
-            color:
-              "#333333",
+            fontSize: 13,
+            fontWeight: 700,
+            color: "#333333",
           }}
         >
           {label}
         </Typography>
       </Box>
 
-      {/* 値 */}
-
       <Box
         sx={{
           px: 2,
-
           py: 2,
-
-          minWidth:
-            0,
+          minWidth: 0,
+          overflowWrap: "anywhere",
         }}
       >
-        <Typography
-          sx={{
-            fontSize:
-              13,
-
-            color:
-              "#333333",
-
-            whiteSpace:
-              multiline
-                ? "pre-wrap"
-                : "normal",
-
-            overflowWrap:
-              "anywhere",
-          }}
-        >
-          {value}
-        </Typography>
+        {children ?? (
+          <Typography
+            sx={{
+              fontSize: 13,
+              color: "#333333",
+              overflowWrap:
+                "anywhere",
+            }}
+          >
+            {value}
+          </Typography>
+        )}
       </Box>
     </Box>
   );

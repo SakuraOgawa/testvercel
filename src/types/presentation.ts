@@ -4,6 +4,7 @@ export type Presenter = {
 
 export type Presentation = {
   id: string;
+  owner: string;
   title: string;
   seminar_name: string;
   created_at: string;

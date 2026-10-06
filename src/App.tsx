@@ -58,6 +58,11 @@ import AdminTeacherPage from "./pages/AdminTeacherPage";
 
 import SettingsPage from "./pages/SettingsPage";
 
+import PresentationDetailPage from "./pages/PresentationDetailPage";
+
+import PresentationEditPage from "./pages/PresentationEditPage";
+import EventProgramPage from "./pages/EventProgramPage";
+
 /*
  * ========================================
  * App
@@ -459,6 +464,26 @@ export default function App() {
           element={
             <PresentationListPage />
           }
+        />
+
+        <Route path="/events/:eventId/program" element={<EventProgramPage />} />
+
+        {/* =============================== */}
+        {/* Presentation Detail */}
+        {/* =============================== */}
+
+        <Route
+          path="/events/:eventId/presentations/:presentationId"
+          element={<PresentationDetailPage />}
+        />
+
+        {/* =============================== */}
+        {/* Presentation Edit */}
+        {/* =============================== */}
+
+        <Route
+          path="/events/:eventId/presentations/:presentationId/edit"
+          element={<PresentationEditPage />}
         />
 
         {/* =============================== */}

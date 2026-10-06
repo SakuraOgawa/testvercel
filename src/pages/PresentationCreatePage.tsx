@@ -1,307 +1,199 @@
 import { useState } from "react";
-
-import type {
-  ChangeEvent,
-  FormEvent,
-  HTMLInputTypeAttribute,
-  ReactNode,
-} from "react";
-
+import type { FormEvent, ReactNode } from "react";
+import { Add, ArrowBack, Close } from "@mui/icons-material";
 import {
   Box,
   Button,
+  Paper,
   TextField,
   Typography,
 } from "@mui/material";
-
-import {
-  Add,
-  Close,
-} from "@mui/icons-material";
-
 import {
   useLocation,
   useNavigate,
   useParams,
 } from "react-router-dom";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
+import rehypeSanitize from "rehype-sanitize";
 
-import Sidebar, {
-  drawerWidth,
-} from "../components/Sidebar";
-
-
+import Sidebar, { drawerWidth } from "../components/Sidebar";
+import { useAuthContext } from "../hooks/useAuthContext";
 import {
   initialPresentationForm,
   type PresentationFormData,
-} from "../types/presentationForm"
-
+} from "../types/presentationForm";
+import "../styles/markdown.css";
 
 type LocationState = {
   form?: PresentationFormData;
 };
 
 type FormErrors = Partial<
-  Record<
-    keyof PresentationFormData,
-    string
-  >
+  Record<keyof PresentationFormData, string>
 >;
 
 export default function PresentationCreatePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  /*
-   * URL
-   *
-   * /events/:eventId/presentations/new
-   *
-   * からeventIdを取得
-   */
   const { eventId } = useParams<{
     eventId: string;
   }>();
 
-  const locationState =
-    location.state as
-      | LocationState
-      | null;
+  const { profile } = useAuthContext();
 
-  /*
-   * 確認画面から「修正する」で
-   * 戻ってきた場合は、
-   * stateに保存されている
-   * 入力内容を復元する
-   */
+  const ownStudentNumber =
+    profile?.student_number?.trim().toUpperCase() ?? "";
+
+  const locationState =
+    location.state as LocationState | null;
+
   const [form, setForm] =
     useState<PresentationFormData>(
-      locationState?.form ??
-        initialPresentationForm,
+      locationState?.form ?? initialPresentationForm,
     );
 
-  /*
-   * 発表者の学籍番号入力欄
-   */
-  const [
-    studentNumber,
-    setStudentNumber,
-  ] = useState("");
+  const [studentNumber, setStudentNumber] =
+    useState("");
 
-  /*
-   * 学籍番号入力欄だけのエラー
-   */
   const [
     presenterInputError,
     setPresenterInputError,
   ] = useState("");
 
-  /*
-   * フォーム全体のエラー
-   */
-  const [
-    errors,
-    setErrors,
-  ] = useState<FormErrors>({});
+  const [errors, setErrors] =
+    useState<FormErrors>({});
 
-  /*
-   * ========================================
-   * 通常フォーム変更
-   * ========================================
-   */
-  const handleChange = <
-    Key extends keyof PresentationFormData,
-  >(
-    field: Key,
-    value: PresentationFormData[Key],
+  const handleChange = (
+    field:
+      | "seminarName"
+      | "title"
+      | "summary"
+      | "documentUrl"
+      | "repositoryUrl",
+    value: string,
   ) => {
-    setForm(
-      (previousForm) => ({
-        ...previousForm,
-        [field]: value,
-      }),
-    );
+    setForm((currentForm) => ({
+      ...currentForm,
+      [field]: value,
+    }));
 
-    /*
-     * 入力した項目の
-     * エラーだけ削除
-     */
-    setErrors(
-      (previousErrors) => ({
-        ...previousErrors,
-        [field]: undefined,
-      }),
-    );
+    setErrors((currentErrors) => ({
+      ...currentErrors,
+      [field]: undefined,
+    }));
   };
 
-  /*
-   * ========================================
-   * 発表者の学籍番号を追加
-   * ========================================
-   */
   const handleAddPresenter = () => {
-    /*
-     * 学籍番号は
-     * 前後空白削除＋大文字に統一
-     */
-    const trimmedStudentNumber =
-      studentNumber
-        .trim()
-        .toUpperCase();
+    const normalizedStudentNumber =
+      studentNumber.trim().toUpperCase();
 
-    /*
-     * 空欄
-     */
-    if (!trimmedStudentNumber) {
+    setPresenterInputError("");
+
+    if (!normalizedStudentNumber) {
       setPresenterInputError(
         "学籍番号を入力してください。",
       );
-
       return;
     }
 
-    /*
-     * 同じ学籍番号を
-     * 二重登録しない
-     */
-    const alreadyExists =
-      form.presenters.some(
-        (presenter) =>
-          presenter.toUpperCase() ===
-          trimmedStudentNumber,
+    if (
+      ownStudentNumber &&
+      normalizedStudentNumber === ownStudentNumber
+    ) {
+      setPresenterInputError(
+        "あなたの学籍番号は自動で発表者に登録されます。",
       );
+      return;
+    }
+
+    const alreadyExists = form.presenters.some(
+      (presenter) =>
+        presenter.trim().toUpperCase() ===
+        normalizedStudentNumber,
+    );
 
     if (alreadyExists) {
       setPresenterInputError(
         "同じ学籍番号がすでに追加されています。",
       );
-
       return;
     }
 
-    setForm(
-      (previousForm) => ({
-        ...previousForm,
+    setForm((currentForm) => ({
+      ...currentForm,
+      presenters: [
+        ...currentForm.presenters,
+        normalizedStudentNumber,
+      ],
+    }));
 
-        presenters: [
-          ...previousForm.presenters,
-          trimmedStudentNumber,
-        ],
-      }),
-    );
-
-    /*
-     * 追加後は入力欄を空にする
-     */
     setStudentNumber("");
 
-    setPresenterInputError("");
-
-    /*
-     * 「発表者を追加してください」
-     * エラーも削除
-     */
-    setErrors(
-      (previousErrors) => ({
-        ...previousErrors,
-        presenters: undefined,
-      }),
-    );
+    setErrors((currentErrors) => ({
+      ...currentErrors,
+      presenters: undefined,
+    }));
   };
 
-  /*
-   * ========================================
-   * 発表者削除
-   * ========================================
-   */
   const handleRemovePresenter = (
-    index: number,
+    studentNumberToRemove: string,
   ) => {
-    setForm(
-      (previousForm) => ({
-        ...previousForm,
-
-        presenters:
-          previousForm.presenters.filter(
-            (_, presenterIndex) =>
-              presenterIndex !== index,
-          ),
-      }),
-    );
+    setForm((currentForm) => ({
+      ...currentForm,
+      presenters: currentForm.presenters.filter(
+        (presenter) =>
+          presenter !== studentNumberToRemove,
+      ),
+    }));
   };
 
-  /*
-   * ========================================
-   * バリデーション
-   * ========================================
-   */
-  const validateForm =
-    (): FormErrors => {
-      const newErrors:
-        FormErrors = {};
+  const validateForm = () => {
+    const newErrors: FormErrors = {};
 
-      if (
-        !form.seminarName.trim()
-      ) {
-        newErrors.seminarName =
-          "ゼミ名または教員名を入力してください。";
-      }
+    if (!form.seminarName.trim()) {
+      newErrors.seminarName =
+        "ゼミ名（教員名）を入力してください。";
+    }
 
-      if (!form.title.trim()) {
-        newErrors.title =
-          "タイトルを入力してください。";
-      }
+    if (!form.title.trim()) {
+      newErrors.title =
+        "タイトルを入力してください。";
+    }
 
-      if (!form.summary.trim()) {
-        newErrors.summary =
-          "発表概要を入力してください。";
-      }
+    if (!form.summary.trim()) {
+      newErrors.summary =
+        "発表概要を入力してください。";
+    }
 
-      if (
-        form.presenters.length ===
-        0
-      ) {
-        newErrors.presenters =
-          "発表者の学籍番号を1件以上追加してください。";
-      }
+    if (
+      !ownStudentNumber &&
+      form.presenters.length === 0
+    ) {
+      newErrors.presenters =
+        "発表者の学籍番号を1件以上追加してください。";
+    }
 
-      return newErrors;
-    };
+    setErrors(newErrors);
 
-  /*
-   * ========================================
-   * 「入力内容を確認」
-   * ========================================
-   */
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (
     event: FormEvent<HTMLFormElement>,
   ) => {
     event.preventDefault();
 
-    const validationErrors =
-      validateForm();
-
-    if (
-      Object.keys(
-        validationErrors,
-      ).length > 0
-    ) {
-      setErrors(
-        validationErrors,
-      );
-
-      return;
-    }
-
     if (!eventId) {
       return;
     }
 
-    setErrors({});
+    if (!validateForm()) {
+      return;
+    }
 
-    /*
-     * eventIdをURLに維持したまま
-     * 確認画面へ
-     */
     navigate(
       `/events/${eventId}/presentations/confirm`,
       {
@@ -312,11 +204,6 @@ export default function PresentationCreatePage() {
     );
   };
 
-  /*
-   * ========================================
-   * キャンセル
-   * ========================================
-   */
   const handleCancel = () => {
     if (!eventId) {
       navigate("/events");
@@ -328,34 +215,20 @@ export default function PresentationCreatePage() {
     );
   };
 
-  /*
-   * ========================================
-   * eventIdが存在しない
-   * ========================================
-   */
   if (!eventId) {
     return (
       <Box
         sx={{
           minHeight: "100vh",
-
-          display: "grid",
-
-          placeItems: "center",
-
           bgcolor: "#f7f8fa",
+          display: "grid",
+          placeItems: "center",
         }}
       >
-        <Box
-          sx={{
-            textAlign: "center",
-          }}
-        >
+        <Box sx={{ textAlign: "center" }}>
           <Typography
             color="error"
-            sx={{
-              mb: 2,
-            }}
+            sx={{ mb: 2 }}
           >
             発表会を特定できませんでした。
           </Typography>
@@ -367,10 +240,8 @@ export default function PresentationCreatePage() {
             }}
             sx={{
               bgcolor: "#172e5a",
-
               "&:hover": {
-                bgcolor:
-                  "#102447",
+                bgcolor: "#102447",
               },
             }}
           >
@@ -385,7 +256,7 @@ export default function PresentationCreatePage() {
     <Box
       sx={{
         minHeight: "100vh",
-        bgcolor: "#ffffff",
+        bgcolor: "#f7f8fa",
       }}
     >
       <Sidebar />
@@ -393,270 +264,399 @@ export default function PresentationCreatePage() {
       <Box
         component="main"
         sx={{
-          minHeight: "100vh",
-
           ml: {
             xs: 0,
             md: `${drawerWidth}px`,
           },
+          minHeight: "100vh",
         }}
       >
         <Box
-          component="form"
-          onSubmit={handleSubmit}
-          noValidate
           sx={{
-            minHeight: "100vh",
-
             px: {
               xs: 2,
               sm: 3,
-              md: 4.5,
+              md: 4,
             },
-
-            pt: 4,
-            pb: 5,
+            py: 4,
           }}
         >
-          {/* ============================= */}
-          {/* タイトル */}
-          {/* ============================= */}
-
-          <Typography
-            component="h1"
+          <Button
+            variant="text"
+            startIcon={<ArrowBack />}
+            onClick={handleCancel}
             sx={{
-              mb: 3,
-
-              fontSize: 22,
-
+              mb: 2,
+              color: "#172e5a",
               fontWeight: 700,
-
-              color: "#333333",
+              textTransform: "none",
             }}
           >
-            発表登録
-          </Typography>
+            発表一覧へ戻る
+          </Button>
 
-          {/* ============================= */}
-          {/* 2カラムフォーム */}
-          {/* ============================= */}
+          <Box sx={{ maxWidth: 1100 }}>
+            <Box sx={{ mb: 3 }}>
+              <Typography
+                component="h1"
+                sx={{
+                  fontSize: {
+                    xs: 24,
+                    md: 28,
+                  },
+                  fontWeight: 700,
+                  color: "#222222",
+                }}
+              >
+                発表を新規登録
+              </Typography>
 
-          <Box
-            sx={{
-              display: "grid",
+              <Typography
+                sx={{
+                  mt: 0.8,
+                  color: "text.secondary",
+                  fontSize: 13,
+                }}
+              >
+                発表情報を入力してください。
+              </Typography>
+            </Box>
 
-              gridTemplateColumns: {
-                xs: "1fr",
-                lg: "1fr 1fr",
-              },
-
-              columnGap: {
-                xs: 0,
-                lg: 5.5,
-              },
-
-              rowGap: 2,
-            }}
-          >
-            {/* ============================= */}
-            {/* 左側 */}
-            {/* ============================= */}
-
-            <Box>
-              {/* ゼミ名 */}
-
+            <Paper
+              component="form"
+              onSubmit={handleSubmit}
+              noValidate
+              elevation={0}
+              sx={{
+                p: {
+                  xs: 2,
+                  sm: 3,
+                },
+                border: "1px solid #e0e0e0",
+                borderRadius: 2,
+              }}
+            >
               <FormFieldLabel>
                 ゼミ名（教員名）
               </FormFieldLabel>
 
-              <StyledTextField
-                value={
-                  form.seminarName
-                }
-                placeholder="例）〇〇ゼミ"
+              <TextField
+                fullWidth
+                size="small"
+                value={form.seminarName}
+                placeholder="例）情報工学ゼミ（佐藤教授）"
                 error={Boolean(
                   errors.seminarName,
                 )}
-                helperText={
-                  errors.seminarName
-                }
-                onChange={(
-                  event,
-                ) => {
+                helperText={errors.seminarName}
+                onChange={(event) => {
                   handleChange(
                     "seminarName",
-                    event.target
-                      .value,
+                    event.target.value,
                   );
                 }}
+                sx={fieldStyle}
               />
-
-              {/* タイトル */}
 
               <FormFieldLabel>
                 タイトル
               </FormFieldLabel>
 
-              <StyledTextField
+              <TextField
+                fullWidth
+                size="small"
                 value={form.title}
-                placeholder="例）AIを用いた〇〇の研究"
-                error={Boolean(
-                  errors.title,
-                )}
-                helperText={
-                  errors.title
-                }
-                onChange={(
-                  event,
-                ) => {
+                placeholder="発表タイトルを入力してください"
+                error={Boolean(errors.title)}
+                helperText={errors.title}
+                onChange={(event) => {
                   handleChange(
                     "title",
-                    event.target
-                      .value,
+                    event.target.value,
                   );
                 }}
+                sx={fieldStyle}
               />
-
-              {/* 発表概要 */}
 
               <FormFieldLabel>
                 発表概要
               </FormFieldLabel>
 
-              <TextField
-                fullWidth
-                multiline
-                minRows={8}
-                value={
-                  form.summary
-                }
-                placeholder="発表の概要を入力してください"
-                error={Boolean(
-                  errors.summary,
-                )}
-                helperText={
-                  errors.summary
-                }
-                onChange={(
-                  event,
-                ) => {
-                  handleChange(
-                    "summary",
-                    event.target
-                      .value,
-                  );
+              <Typography
+                sx={{
+                  mb: 1.2,
+                  color: "text.secondary",
+                  fontSize: 12,
                 }}
-                sx={fieldStyle}
-              />
-            </Box>
+              >
+                Markdown形式で入力できます。右側にリアルタイムでプレビューされます。
+              </Typography>
 
-            {/* ============================= */}
-            {/* 右側 */}
-            {/* ============================= */}
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    lg: "minmax(0, 1fr) minmax(0, 1fr)",
+                  },
+                  gap: 2,
+                }}
+              >
+                <Box>
+                  <Typography
+                    sx={{
+                      mb: 0.8,
+                      color: "#555555",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    Markdown
+                  </Typography>
 
-            <Box>
-              {/* 資料URL */}
+                  <TextField
+                    fullWidth
+                    multiline
+                    minRows={16}
+                    value={form.summary}
+                    placeholder={`## 研究概要
+
+この研究では、**〇〇**について検討します。<br>
+ここで改行できます。
+
+### 目的
+
+- 目的1
+- 目的2
+- 目的3
+
+### 使用技術
+
+| 技術 | 用途 |
+| --- | --- |
+| React | フロントエンド |
+| Supabase | データベース |
+
+> 発表情報を効率的に管理することを目的とする。
+
+[GitHub](https://github.com/)`}
+                    error={Boolean(
+                      errors.summary,
+                    )}
+                    helperText={errors.summary}
+                    onChange={(event) => {
+                      handleChange(
+                        "summary",
+                        event.target.value,
+                      );
+                    }}
+                    sx={{
+                      ...fieldStyle,
+                      "& .MuiInputBase-root": {
+                        alignItems: "flex-start",
+                      },
+                      "& textarea": {
+                        fontFamily:
+                          '"SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace',
+                        fontSize: 13,
+                        lineHeight: 1.7,
+                      },
+                    }}
+                  />
+                </Box>
+
+                <Box>
+                  <Typography
+                    sx={{
+                      mb: 0.8,
+                      color: "#555555",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    プレビュー
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      minHeight: 408,
+                      maxHeight: 520,
+                      px: 2,
+                      py: 1.5,
+                      overflow: "auto",
+                      bgcolor: "#ffffff",
+                      border:
+                        "1px solid #d5d5d5",
+                      borderRadius: 1,
+                    }}
+                  >
+                    {form.summary.trim() ? (
+                      <Box className="markdown-content">
+                        <ReactMarkdown
+                          remarkPlugins={[
+                            remarkGfm,
+                          ]}
+                          rehypePlugins={[
+                            rehypeRaw,
+                            rehypeSanitize,
+                          ]}
+                        >
+                          {form.summary}
+                        </ReactMarkdown>
+                      </Box>
+                    ) : (
+                      <Typography
+                        sx={{
+                          py: 1,
+                          color:
+                            "text.secondary",
+                          fontSize: 13,
+                        }}
+                      >
+                        Markdownを入力すると、ここにプレビューが表示されます。
+                      </Typography>
+                    )}
+                  </Box>
+                </Box>
+              </Box>
 
               <FormFieldLabel>
                 資料等へのリンク
               </FormFieldLabel>
 
-              <StyledTextField
+              <TextField
+                fullWidth
+                size="small"
                 type="url"
-                value={
-                  form.documentUrl
-                }
+                value={form.documentUrl}
                 placeholder="例）https://example.com/slides.pdf"
-                onChange={(
-                  event,
-                ) => {
+                onChange={(event) => {
                   handleChange(
                     "documentUrl",
-                    event.target
-                      .value,
+                    event.target.value,
                   );
                 }}
+                sx={fieldStyle}
               />
-
-              {/* GitHub URL */}
 
               <FormFieldLabel>
                 Gitリポジトリへのリンク
               </FormFieldLabel>
 
-              <StyledTextField
+              <TextField
+                fullWidth
+                size="small"
                 type="url"
-                value={
-                  form.repositoryUrl
-                }
+                value={form.repositoryUrl}
                 placeholder="例）https://github.com/example/repo"
-                onChange={(
-                  event,
-                ) => {
+                onChange={(event) => {
                   handleChange(
                     "repositoryUrl",
-                    event.target
-                      .value,
+                    event.target.value,
                   );
                 }}
+                sx={fieldStyle}
               />
-
-              {/* ============================= */}
-              {/* 発表者 */}
-              {/* ============================= */}
 
               <FormFieldLabel>
                 発表者
               </FormFieldLabel>
 
+              {ownStudentNumber && (
+                <Box sx={{ mb: 2 }}>
+                  <Typography
+                    sx={{
+                      mb: 0.7,
+                      color: "#555555",
+                      fontSize: 12,
+                      fontWeight: 700,
+                    }}
+                  >
+                    あなた
+                  </Typography>
+
+                  <Box
+                    sx={{
+                      minHeight: 42,
+                      px: 1.5,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent:
+                        "space-between",
+                      border:
+                        "1px solid #d5d5d5",
+                      borderRadius: 1,
+                      bgcolor: "#f7f8fa",
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontSize: 13,
+                        color: "#333333",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {ownStudentNumber}
+                    </Typography>
+
+                    <Typography
+                      sx={{
+                        fontSize: 11,
+                        color: "#777777",
+                      }}
+                    >
+                      自動登録
+                    </Typography>
+                  </Box>
+                </Box>
+              )}
+
               <Typography
                 sx={{
                   mb: 1,
+                  color: "#555555",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                {ownStudentNumber
+                  ? "共同発表者"
+                  : "発表者"}
+              </Typography>
 
+              <Typography
+                sx={{
+                  mb: 1,
                   color: "#777777",
-
                   fontSize: 12,
                 }}
               >
-                発表者の学籍番号を入力して＋ボタンで追加してください
+                {ownStudentNumber
+                  ? "共同発表者がいる場合は、学籍番号を入力して追加してください"
+                  : "発表者の学籍番号を入力して追加してください"}
               </Typography>
-
-              {/* 学籍番号入力欄 */}
 
               <Box
                 sx={{
                   display: "flex",
-
-                  alignItems:
-                    "flex-start",
-
+                  alignItems: "flex-start",
                   gap: 1,
                 }}
               >
                 <TextField
                   fullWidth
                   size="small"
-
-                  value={
-                    studentNumber
-                  }
-
+                  value={studentNumber}
                   placeholder="例）G23900"
-
                   error={Boolean(
                     presenterInputError,
                   )}
-
                   helperText={
                     presenterInputError
                   }
-
-                  onChange={(
-                    event,
-                  ) => {
+                  onChange={(event) => {
                     setStudentNumber(
-                      event.target
-                        .value,
+                      event.target.value,
                     );
 
                     if (
@@ -667,45 +667,23 @@ export default function PresentationCreatePage() {
                       );
                     }
                   }}
-
-                  /*
-                   * Enterで追加しない。
-                   *
-                   * IME変換のEnterで
-                   * 勝手に追加される問題を防ぐ。
-                   */
-                  sx={fieldStyle}
                 />
 
                 <Button
                   type="button"
-
                   variant="contained"
-
                   aria-label="発表者を追加"
-
                   onClick={
                     handleAddPresenter
                   }
-
                   sx={{
-                    minWidth: 44,
-
-                    width: 44,
-
+                    minWidth: 42,
+                    width: 42,
                     height: 40,
-
                     p: 0,
-
-                    bgcolor:
-                      "#172e5a",
-
-                    boxShadow:
-                      "0 2px 5px rgba(0,0,0,0.12)",
-
+                    bgcolor: "#172e5a",
                     "&:hover": {
-                      bgcolor:
-                        "#102447",
+                      bgcolor: "#102447",
                     },
                   }}
                 >
@@ -713,68 +691,53 @@ export default function PresentationCreatePage() {
                 </Button>
               </Box>
 
-              {/* ============================= */}
-              {/* 追加済み発表者 */}
-              {/* ============================= */}
+              {errors.presenters && (
+                <Typography
+                  role="alert"
+                  sx={{
+                    mt: 0.8,
+                    color: "error.main",
+                    fontSize: 12,
+                  }}
+                >
+                  {errors.presenters}
+                </Typography>
+              )}
 
-              {form.presenters
-                .length > 0 && (
+              {form.presenters.length >
+                0 && (
                 <Box
                   sx={{
-                    mt: 1,
-
+                    mt: 2,
                     display: "flex",
-
-                    flexDirection:
-                      "column",
-
+                    flexWrap: "wrap",
                     gap: 1,
                   }}
                 >
                   {form.presenters.map(
-                    (
-                      presenter,
-                      index,
-                    ) => (
+                    (presenter) => (
                       <Box
-                        key={`${presenter}-${index}`}
+                        key={presenter}
                         sx={{
-                          minHeight: 42,
-
-                          px: 1.5,
-
-                          display:
-                            "flex",
-
+                          display: "flex",
                           alignItems:
                             "center",
-
-                          justifyContent:
-                            "space-between",
-
-                          border:
-                            "1px solid #d5d5d5",
-
-                          borderRadius:
-                            1,
-
+                          gap: 0.5,
+                          px: 1.2,
+                          py: 0.7,
                           bgcolor:
-                            "#ffffff",
-
-                          boxShadow:
-                            "0 1px 3px rgba(0,0,0,0.06)",
+                            "#f0f2f6",
+                          border:
+                            "1px solid #d9dde5",
+                          borderRadius: 1,
                         }}
                       >
                         <Typography
                           sx={{
-                            fontSize:
-                              13,
-
+                            fontSize: 12,
                             color:
                               "#333333",
-
-                            fontWeight:
-                              600,
+                            fontWeight: 600,
                           }}
                         >
                           {presenter}
@@ -782,42 +745,30 @@ export default function PresentationCreatePage() {
 
                         <Button
                           type="button"
-
                           aria-label={`${presenter}を削除`}
-
                           onClick={() => {
                             handleRemovePresenter(
-                              index,
+                              presenter,
                             );
                           }}
-
                           sx={{
-                            minWidth:
-                              32,
-
-                            width: 32,
-
-                            height: 32,
-
+                            minWidth: 24,
+                            width: 24,
+                            height: 24,
                             p: 0,
-
                             color:
-                              "#888888",
-
-                            "&:hover":
-                              {
-                                color:
-                                  "#d32f2f",
-
-                                bgcolor:
-                                  "rgba(211,47,47,0.05)",
-                              },
+                              "#777777",
+                            "&:hover": {
+                              color:
+                                "#d32f2f",
+                              bgcolor:
+                                "rgba(211,47,47,0.05)",
+                            },
                           }}
                         >
                           <Close
                             sx={{
-                              fontSize:
-                                19,
+                              fontSize: 16,
                             }}
                           />
                         </Button>
@@ -827,91 +778,41 @@ export default function PresentationCreatePage() {
                 </Box>
               )}
 
-              {/* 発表者0件 */}
-
-              {errors.presenters && (
-                <Typography
-                  role="alert"
-
-                  sx={{
-                    mt: 0.7,
-
-                    color:
-                      "error.main",
-
-                    fontSize: 12,
-                  }}
-                >
-                  {
-                    errors.presenters
-                  }
-                </Typography>
-              )}
-
-              {/* ============================= */}
-              {/* ボタン */}
-              {/* ============================= */}
-
               <Box
                 sx={{
-                  mt: {
-                    xs: 4,
-                    lg: 8,
-                  },
-
+                  mt: 4,
+                  pt: 3,
+                  borderTop:
+                    "1px solid #eeeeee",
                   display: "flex",
-
                   flexDirection: {
                     xs: "column-reverse",
                     sm: "row",
                   },
-
                   justifyContent:
                     "flex-end",
-
                   gap: 1.5,
                 }}
               >
                 <Button
                   type="button"
-
                   variant="outlined"
-
-                  onClick={
-                    handleCancel
-                  }
-
+                  onClick={handleCancel}
                   sx={{
                     width: {
                       xs: "100%",
                       sm: 130,
                     },
-
                     height: 44,
-
-                    color:
-                      "#333333",
-
+                    color: "#555555",
                     borderColor:
-                      "#bdbdbd",
-
-                    fontSize: 13,
-
-                    fontWeight:
-                      700,
-
-                    textTransform:
-                      "none",
-
-                    boxShadow:
-                      "0 2px 4px rgba(0,0,0,0.1)",
-
+                      "#bbbbbb",
+                    fontWeight: 700,
+                    textTransform: "none",
                     "&:hover": {
                       borderColor:
                         "#999999",
-
-                      bgcolor:
-                        "#fafafa",
+                      bgcolor: "#fafafa",
                     },
                   }}
                 >
@@ -920,41 +821,25 @@ export default function PresentationCreatePage() {
 
                 <Button
                   type="submit"
-
                   variant="contained"
-
                   sx={{
                     width: {
                       xs: "100%",
                       sm: 160,
                     },
-
                     height: 44,
-
-                    bgcolor:
-                      "#172e5a",
-
-                    fontSize: 13,
-
-                    fontWeight:
-                      700,
-
-                    textTransform:
-                      "none",
-
-                    boxShadow:
-                      "0 2px 5px rgba(0,0,0,0.15)",
-
+                    bgcolor: "#172e5a",
+                    fontWeight: 700,
+                    textTransform: "none",
                     "&:hover": {
-                      bgcolor:
-                        "#102447",
+                      bgcolor: "#102447",
                     },
                   }}
                 >
                   入力内容を確認
                 </Button>
               </Box>
-            </Box>
+            </Paper>
           </Box>
         </Box>
       </Box>
@@ -962,33 +847,24 @@ export default function PresentationCreatePage() {
   );
 }
 
-/*
- * =========================================
- * ラベル
- * =========================================
- */
-
-type FormFieldLabelProps = {
-  children: ReactNode;
-};
-
 function FormFieldLabel({
   children,
-}: FormFieldLabelProps) {
+}: {
+  children: ReactNode;
+}) {
   return (
     <Typography
       component="label"
       sx={{
         display: "block",
-
-        mt: 0.8,
-        mb: 0.7,
-
+        mt: 2.5,
+        mb: 0.8,
         color: "#333333",
-
         fontSize: 13,
-
         fontWeight: 700,
+        "&:first-of-type": {
+          mt: 0,
+        },
       }}
     >
       {children}
@@ -996,94 +872,8 @@ function FormFieldLabel({
   );
 }
 
-/*
- * =========================================
- * 共通TextField
- * =========================================
- */
-
-type StyledTextFieldProps = {
-  value: string;
-
-  placeholder: string;
-
-  type?: HTMLInputTypeAttribute;
-
-  error?: boolean;
-
-  helperText?: string;
-
-  onChange: (
-    event: ChangeEvent<HTMLInputElement>,
-  ) => void;
-};
-
-function StyledTextField({
-  value,
-  placeholder,
-  type = "text",
-  error = false,
-  helperText,
-  onChange,
-}: StyledTextFieldProps) {
-  return (
-    <TextField
-      fullWidth
-
-      size="small"
-
-      type={type}
-
-      value={value}
-
-      placeholder={placeholder}
-
-      error={error}
-
-      helperText={helperText}
-
-      onChange={onChange}
-
-      sx={fieldStyle}
-    />
-  );
-}
-
-/*
- * =========================================
- * 入力欄共通スタイル
- * =========================================
- */
-
 const fieldStyle = {
-  mb: 0.7,
-
-  bgcolor: "#ffffff",
-
   "& .MuiOutlinedInput-root": {
-    borderRadius: 1,
-
-    fontSize: 13,
-
-    boxShadow:
-      "0 2px 5px rgba(0,0,0,0.12)",
-  },
-
-  "& .MuiOutlinedInput-notchedOutline":
-    {
-      borderColor: "#d5d5d5",
-    },
-
-  "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline":
-    {
-      borderColor: "#b8b8b8",
-    },
-
-  "& .MuiFormHelperText-root": {
-    mx: 0,
-
-    mt: 0.5,
-
-    fontSize: 12,
+    bgcolor: "#ffffff",
   },
 };
