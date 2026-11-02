@@ -1,12 +1,18 @@
+import { useState } from "react";
+
 import {
   Avatar,
   Box,
+  Drawer,
+  IconButton,
   Button,
   Typography,
 } from "@mui/material";
 
 import {
   AdminPanelSettings,
+  Close,
+  Menu,
   AssignmentInd,
   Home,
   HowToReg,
@@ -55,6 +61,9 @@ export default function Sidebar() {
 
   const location =
     useLocation();
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const goTo = (path: string) => { setMobileOpen(false); navigate(path); };
+
 
   /*
    * ========================================
@@ -218,7 +227,26 @@ export default function Sidebar() {
    * ========================================
    */
 
+  const mobileContent = (
+    <Box sx={{ width: drawerWidth, height: "100%", display: "flex", flexDirection: "column", color: "#fff", bgcolor: "#172e5a", pt: 2 }}>
+      <Box sx={{ px: 2.5, pb: 2, display: "flex", alignItems: "center", gap: 1.5 }}><School sx={{ fontSize: 30 }} /><Typography sx={{ fontSize: 16, fontWeight: 700 }}>卒業発表管理システム</Typography><IconButton aria-label="メニューを閉じる" onClick={() => setMobileOpen(false)} sx={{ ml: "auto", color: "#fff" }}><Close /></IconButton></Box>
+      <Box component="nav" sx={{ px: 1.5, display: "flex", flexDirection: "column", gap: 0.5 }}>
+        <Button fullWidth startIcon={<Home />} onClick={() => goTo("/events")} sx={menuButtonStyle(isActive("/events"))}>ホーム</Button>
+        {profile.role === "pending" && <Button fullWidth startIcon={<AssignmentInd />} onClick={() => goTo("/register")} sx={menuButtonStyle(location.pathname.startsWith("/register"))}>利用者登録</Button>}
+        {profile.role === "student_pending" && <Button fullWidth startIcon={<PendingActions />} onClick={() => goTo("/register/student")} sx={menuButtonStyle(isActive("/register/student"))}>学生登録申請状況</Button>}
+        {profile.role === "teacher_pending" && <Button fullWidth startIcon={<PendingActions />} onClick={() => goTo("/register/teacher")} sx={menuButtonStyle(isActive("/register/teacher"))}>教員申請状況</Button>}
+        {profile.role === "admin" && <><Button fullWidth startIcon={<HowToReg />} onClick={() => goTo("/admin/students")} sx={menuButtonStyle(isActive("/admin/students"))}>学籍番号申請管理</Button><Button fullWidth startIcon={<AdminPanelSettings />} onClick={() => goTo("/admin/teachers")} sx={menuButtonStyle(isActive("/admin/teachers"))}>教員申請管理</Button></>}
+        {hasSelectedEvent && <><Typography sx={{ mt: 2, px: 1.5, color: "rgba(255,255,255,.55)", fontSize: 10, fontWeight: 700 }}>発表会</Typography><Button fullWidth startIcon={<Summarize />} onClick={() => goTo(`/events/${eventId}/presentations`)} sx={menuButtonStyle(location.pathname.startsWith(`/events/${eventId}/presentations`))}>発表一覧</Button><Button fullWidth startIcon={<Summarize />} onClick={() => goTo(`/events/${eventId}/program`)} sx={menuButtonStyle(location.pathname === `/events/${eventId}/program`)}>発表プログラム</Button><Button fullWidth startIcon={<People />} onClick={() => goTo(`/events/${eventId}/students`)} sx={menuButtonStyle(location.pathname.startsWith(`/events/${eventId}/students`))}>学生一覧</Button></>}
+        <Button fullWidth startIcon={<Settings />} onClick={() => goTo("/settings")} sx={menuButtonStyle(isActive("/settings"))}>設定</Button>
+      </Box>
+      <Box sx={{ mt: "auto", p: 2.5 }}><Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}><Avatar src={avatarUrl} alt={userName} sx={{ width: 42, height: 42, bgcolor: "#6f92db" }}>{userName.slice(0, 1)}</Avatar><Box><Typography sx={{ fontSize: 12, fontWeight: 700 }}>{userName}</Typography><Typography sx={{ fontSize: 12, color: "rgba(255,255,255,.65)" }}>{roleLabel}</Typography></Box></Box><Button fullWidth startIcon={<Logout />} onClick={() => void handleLogout()} sx={{ mt: 2, justifyContent: "flex-start", color: "#fff" }}>ログアウト</Button></Box>
+    </Box>
+  );
+
   return (
+    <>
+    <Box sx={{ display: { xs: "flex", md: "none" }, position: "fixed", top: 8, left: 8, zIndex: 1200 }}><IconButton aria-label="メニューを開く" onClick={() => setMobileOpen(true)} sx={{ bgcolor: "#172e5a", color: "#fff", boxShadow: 2, "&:hover": { bgcolor: "#233e70" } }}><Menu /></IconButton></Box>
+    <Drawer anchor="left" open={mobileOpen} onClose={() => setMobileOpen(false)} sx={{ display: { xs: "block", md: "none" }, "& .MuiDrawer-paper": { width: drawerWidth, bgcolor: "#172e5a" } }}>{mobileContent}</Drawer>
     <Box
       component="aside"
       sx={{
@@ -318,7 +346,7 @@ export default function Sidebar() {
             <Home />
           }
           onClick={() => {
-            navigate(
+            goTo(
               "/events",
             );
           }}
@@ -343,7 +371,7 @@ export default function Sidebar() {
               <AssignmentInd />
             }
             onClick={() => {
-              navigate(
+              goTo(
                 "/register",
               );
             }}
@@ -369,7 +397,7 @@ export default function Sidebar() {
               <PendingActions />
             }
             onClick={() => {
-              navigate(
+              goTo(
                 "/register/student",
               );
             }}
@@ -395,7 +423,7 @@ export default function Sidebar() {
               <PendingActions />
             }
             onClick={() => {
-              navigate(
+              goTo(
                 "/register/teacher",
               );
             }}
@@ -425,7 +453,7 @@ export default function Sidebar() {
                 <HowToReg />
               }
               onClick={() => {
-                navigate(
+                goTo(
                   "/admin/students",
                 );
               }}
@@ -446,7 +474,7 @@ export default function Sidebar() {
                 <AdminPanelSettings />
               }
               onClick={() => {
-                navigate(
+                goTo(
                   "/admin/teachers",
                 );
               }}
@@ -500,7 +528,7 @@ export default function Sidebar() {
                 <Summarize />
               }
               onClick={() => {
-                navigate(
+                goTo(
                   `/events/${eventId}/presentations`,
                 );
               }}
@@ -516,7 +544,7 @@ export default function Sidebar() {
             <Button
               fullWidth
               startIcon={<Summarize />}
-              onClick={() => navigate(`/events/${eventId}/program`)}
+              onClick={() => goTo(`/events/${eventId}/program`)}
               sx={menuButtonStyle(location.pathname === `/events/${eventId}/program`)}
             >
               発表プログラム
@@ -530,7 +558,7 @@ export default function Sidebar() {
                 <People />
               }
               onClick={() => {
-                navigate(
+                goTo(
                   `/events/${eventId}/students`,
                 );
               }}
@@ -555,7 +583,7 @@ export default function Sidebar() {
               <Settings />
             }
             onClick={() => {
-              navigate(
+              goTo(
                 "/settings",
               );
             }}
@@ -691,5 +719,6 @@ export default function Sidebar() {
         </Button>
       </Box>
     </Box>
+    </>
   );
 }

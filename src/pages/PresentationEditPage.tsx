@@ -9,6 +9,7 @@ import {
   Paper,
   TextField,
   Typography,
+  MenuItem,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
@@ -55,6 +56,7 @@ export default function PresentationEditPage() {
 
   const [owner, setOwner] = useState("");
   const [allPresenters, setAllPresenters] = useState<string[]>([]);
+  const [seminarOptions, setSeminarOptions] = useState<string[]>([]);
 
   const [form, setForm] = useState<PresentationFormData>({
     seminarName: "",
@@ -141,6 +143,9 @@ export default function PresentationEditPage() {
 
       setOwner(row.owner);
       setAllPresenters(presenterNumbers);
+      const { data: seminarRows } = await supabase.from("presentations").select("seminar_name").eq("event_id", eventId).not("seminar_name", "is", null);
+      const names = [...new Set([row.seminar_name, ...(seminarRows ?? []).map((item) => item.seminar_name)].map((name) => name?.trim()).filter((name): name is string => Boolean(name)))].sort((a, b) => a.localeCompare(b, "ja"));
+      setSeminarOptions(names);
 
       const coPresenters = ownStudentNumber
         ? presenterNumbers.filter(
@@ -257,8 +262,7 @@ export default function PresentationEditPage() {
     const newErrors: FormErrors = {};
 
     if (!form.seminarName.trim()) {
-      newErrors.seminarName =
-        "ゼミ名（教員名）を入力してください。";
+      newErrors.seminarName = "ゼミ名（教員名）を入力してください。";
     }
 
     if (!form.title.trim()) {
@@ -520,19 +524,17 @@ export default function PresentationEditPage() {
 
                   <TextField
                     fullWidth
+                    select
                     size="small"
                     value={form.seminarName}
-                    placeholder="例）情報工学ゼミ（佐藤教授）"
                     error={Boolean(errors.seminarName)}
-                    helperText={errors.seminarName}
-                    onChange={(event) => {
-                      handleChange(
-                        "seminarName",
-                        event.target.value,
-                      );
-                    }}
+                    helperText={errors.seminarName || "ゼミを選択してください。"}
+                    onChange={(event) => handleChange("seminarName", event.target.value)}
                     sx={fieldStyle}
-                  />
+                  >
+                    <MenuItem value="">ゼミ未設定</MenuItem>
+                    {seminarOptions.map((name) => <MenuItem key={name} value={name}>{name}</MenuItem>)}
+                  </TextField>
 
                   <FormFieldLabel>
                     タイトル

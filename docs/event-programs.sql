@@ -15,3 +15,6 @@ create policy program_update on public.event_programs for update to authenticate
 ) with check (
  exists (select 1 from public.profiles where id = (select auth.uid()) and role in ('teacher','admin'))
 );
+
+-- Realtime: run once if event_programs is not already in the publication.
+alter publication supabase_realtime add table public.event_programs;

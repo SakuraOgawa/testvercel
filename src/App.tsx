@@ -62,6 +62,7 @@ import PresentationDetailPage from "./pages/PresentationDetailPage";
 
 import PresentationEditPage from "./pages/PresentationEditPage";
 import EventProgramPage from "./pages/EventProgramPage";
+import ProgramIndexPage from "./pages/ProgramIndexPage";
 
 /*
  * ========================================
@@ -466,6 +467,7 @@ export default function App() {
           }
         />
 
+        <Route path="/program" element={<ProgramIndexPage />} />
         <Route path="/events/:eventId/program" element={<EventProgramPage />} />
 
         {/* =============================== */}
